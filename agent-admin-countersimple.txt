@@ -1,0 +1,21 @@
+Option Public
+Option Declare
+
+
+
+
+Sub Initialize
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim view As NotesView
+	Dim key(0) As String
+	Set doc = s.DocumentContext
+	If doc.Version(0) = "Production" Then
+		Set db = doc.ParentDatabase
+		Set view = db.getView ( "vAdminUNID" )
+		key(0) = doc.UniversalID
+		doc.Count = Cint ( doc.Count(0) ) + 1
+		Call doc.Save ( True , True )
+	End If
+End Sub

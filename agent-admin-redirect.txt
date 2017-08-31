@@ -1,0 +1,24 @@
+Option Public
+Option Explicit
+
+
+
+
+
+Sub Initialize
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim dc As NotesDocumentCollection
+	Dim doc As NotesDocument
+	Dim context As NotesDocument
+	Dim arg , pageStr As String
+	Dim pos As Integer
+	Set context = s.DocumentContext
+	Set db = s.CurrentDatabase
+	arg = s.DocumentContext.Query_String(0)
+	pos = Instr ( arg , "&" ) 
+	arg = Mid$ ( arg , pos + 1 )
+	pos = Instr ( arg , "=" ) 
+	arg = Mid$ ( arg , pos + 1 )
+	Print "[http://cs.bms.com/cs/cs.nsf/index.html?OpenFrameSet&Frame=body&Src=/cs/cs.nsf/SiteMap/" + arg + "?OpenDocument]"
+End Sub

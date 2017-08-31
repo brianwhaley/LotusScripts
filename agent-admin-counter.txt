@@ -1,0 +1,264 @@
+Option Public
+Option Declare
+
+
+
+
+Dim s As NotesSession
+Dim db As NotesDatabase
+Dim doc As NotesDocument
+Dim counterDoc As NotesDocument
+Dim view As NotesView
+Dim item As NotesItem
+Dim nowDate As Variant
+Dim thisDate As Variant
+Dim lastDate As Variant
+Dim thisWeek As Variant
+Dim lastWeek As Variant
+Dim thisMonth As Variant
+Dim lastMonth As Variant
+Dim topDate As Variant
+Dim topWeek As Variant
+Dim topMonth As Variant
+Dim counterDate As Variant
+Dim counterWeek As Variant
+Dim counterMonth As Variant
+Dim key(1) As String
+Dim nam_dt As String
+Dim lastday_dt As NotesDateTime
+
+
+
+
+Sub Initialize
+	
+	' On Error Resume Next
+	' On Error Goto processError
+	On Error 6 Resume Next ' Overflow in writing value to TotalCount field
+	
+	Set s = New NotesSession
+	Set doc = s.DocumentContext
+	Set db = doc.ParentDatabase
+	Set view = db.getView ( "Counters" )
+	
+	Set nowDate = New NotesDateTime ( Now )
+	Set lastDate = New NotesDateTime ( Now )
+	Call lastDate.AdjustDay ( -1 )
+	
+	Set thisWeek = New NotesDateTime ( Now )
+	Call thisWeek.AdjustDay ( ( 7 - Cint ( dayOfTheWeek ) - 1 ) )
+	Set lastWeek = New NotesDateTime ( Now )
+	Call lastWeek.AdjustDay ( ( 7 - Cint ( dayOfTheWeek ) - 1 ) )
+	Call lastWeek.AdjustDay ( ( -7 ) )
+	
+	Set thisMonth = New NotesDateTime ( Now )
+	Call thisMonth.AdjustDay ( - Cint ( Day ( Now ) ) + 1 )
+	Set thisMonth = New NotesDateTime ( Cstr ( LastDayOfMonth ( Cstr ( thisMonth.dateOnly ) ).DateOnly ) )
+	Set lastMonth = New NotesDateTime ( Now )
+	Call lastMonth.AdjustDay ( - Cint ( Day ( Now ) ) + 1 )
+	Call lastMonth.AdjustMonth ( - 1 )
+	Set lastMonth = New NotesDateTime ( Cstr ( LastDayOfMonth ( Cstr ( lastMonth.dateOnly ) ).DateOnly ) )
+	
+	If doc.Version(0) = "Production" Then
+		If doc.Trash(0) <> "" Then
+		Else
+			key(0) = doc.Title(0)
+			key(1) = doc.UniversalID
+			Set counterDoc = view.getDocumentByKey ( key , True )
+			If Not ( counterDoc Is Nothing ) Then
+				Call incrementCount ( key(0) )
+			Elseif ( counterDoc Is Nothing ) Then
+				Call createNewCounter ( key(0) , key(1) )
+			End If
+		End If
+	Elseif doc.SaveOptions(0) = "0" Then
+		key(0) = doc.Form(0)
+		key(1) = doc.Form(0)
+		Set counterDoc = view.getDocumentByKey ( key , True )
+		If Not ( counterDoc Is Nothing ) Then
+			Call incrementCount ( key (0) )
+		Elseif ( counterDoc Is Nothing ) Then
+			Call createNewCounter ( key(0) , key(1) )
+		End If
+	End If
+	
+'processError:
+	'Messagebox "Error " & Err() & ": " & Error()
+	'Exit Sub
+	
+End Sub
+
+
+
+
+
+Sub incrementCount ( docTitle As String )
+	
+	Set counterDate = New NotesDateTime ( Cdat ( Cstr ( counterDoc.Today(0) ) ) )
+	Set counterWeek = New NotesDateTime ( Cdat ( Cstr ( counterDoc.ThisWeek(0) ) ) )
+	Set counterMonth = New NotesDateTime ( Cdat ( Cstr ( counterDoc.ThisMonth(0) ) ) )
+	Set topDate = New NotesDateTime ( Cdat ( Cstr ( counterDoc.TopDay(0) ) ) )
+	Set topWeek = New NotesDateTime ( Cdat ( Cstr ( counterDoc.TopWeek(0) ) ) )
+	Set topMonth = New NotesDateTime ( Cdat ( Cstr ( counterDoc.TopMonth(0) ) ) )	
+	'=============TODAY=================================================
+	If  Year ( nowDate.DateOnly ) > Year ( counterDate.DateOnly )  Or _
+	nowDate.DateOnly > counterDate.DateOnly Then
+		If counterDoc.TodayCount(0) > counterDoc.TopDayCount(0) Then
+			counterDoc.TopDay = counterDoc.Today
+			counterDoc.TopDayCount = counterDoc.TodayCount
+		End If
+		counterDoc.Yesterday = counterDoc.Today
+		counterDoc.Today = nowDate.DateOnly
+		counterDoc.YesterdayCount = counterDoc.TodayCount
+		counterDoc.TodayCount = 1
+	Else
+		counterDoc.TodayCount = Cint ( counterDoc.TodayCount(0) ) + 1
+	End If	
+	'=============THIS WEEK=================================================
+	If Year ( thisWeek.DateOnly ) > Year ( counterWeek.DateOnly )  Or _
+	thisWeek.DateOnly > counterWeek.DateOnly Then
+		If counterDoc.ThisWeekCount(0) > counterDoc.TopWeekCount(0) Then
+			counterDoc.TopWeek = counterDoc.ThisWeek
+			counterDoc.TopWeekCount = counterDoc.ThisWeekCount
+		End If
+		counterDoc.LastWeek = counterDoc.ThisWeek
+		counterdoc.ThisWeek = thisWeek.DateOnly
+		counterDoc.LastWeekCount = counterDoc.ThisWeekCount(0)
+		counterDoc.ThisWeekCount = 1
+	Else
+		counterDoc.ThisWeekCount = Cint ( counterDoc.ThisWeekCount(0) ) + 1
+	End If	
+	'=============THIS MONTH================================================
+	If Year ( thisMonth.DateOnly ) > Year ( counterMonth.DateOnly )  Or _
+	thisMonth.DateOnly > counterMonth.DateOnly Then
+		If counterDoc.ThisMonthCount(0) > counterDoc.TopMonthCount(0) Then
+			counterDoc.TopMonth = counterDoc.ThisMonth
+			counterDoc.TopMonthCount = counterDoc.ThisMonthCount
+		End If
+		counterDoc.LastMonth = counterDoc.ThisMonth
+		counterDoc.ThisMonth = thisMonth.DateOnly
+		counterDoc.LastMonthCount = counterDoc.ThisMonthCount
+		counterDoc.ThisMonthCount = 1
+	Else
+		counterDoc.ThisMonthCount = Cint ( counterDoc.ThisMonthCount(0) ) + 1
+	End If	
+	'=======================================================================
+	Set item = counterDoc.ReplaceItemValue( "TotalCount" , Cint ( counterDoc.TotalCount(0) ) + 1 )	
+	counterDoc.docTitle = docTitle 
+	counterDoc.UNID = counterDoc.UniversalID
+	Call counterDoc.Save ( True , True )
+	
+End Sub
+
+
+
+
+Sub createNewCounter ( docTitle As String , docID As String )
+	Set counterDoc = New NotesDocument ( db )
+	
+	counterDoc.Form = "Counter"
+	counterDoc.docTitle = docTitle
+	counterDoc.docID = docID
+	counterDoc.~$PublicAccess = "1"
+	
+	counterDoc.TodayCount = 1
+	counterDoc.YesterdayCount = 0
+	counterDoc.TopDayCount = 0
+	counterDoc.ThisWeekCount = 1
+	counterDoc.LastWeekCount = 0
+	counterDoc.TopWeekCount = 0
+	counterDoc.ThisMonthCount = 1
+	counterDoc.LastMonthCount = 0
+	counterDoc.TopMonthCount = 0
+	counterDoc.TotalCount = 1	
+	
+	counterDoc.Today = nowDate.DateOnly
+	counterDoc.TopDay = nowDate.DateOnly
+	counterDoc.Yesterday = lastDate.DateOnly
+	counterDoc.ThisWeek = thisWeek.DateOnly
+	counterDoc.LastWeek = lastWeek.DateOnly
+	counterDoc.TopWeek = thisWeek.DateOnly
+	counterDoc.ThisMonth = thisMonth.DateOnly
+	counterDoc.LastMonth = lastMonth.DateOnly	
+	counterDoc.TopMonth = thisMonth.DateOnly
+	
+	counterDoc.UNID = counterDoc.UniversalID
+	Call counterDoc.Save ( True , True )
+End Sub
+
+
+
+
+
+Function dayOfTheWeek	
+' a = [ ( 14 - month ) / 12 ]
+' y = year - a
+' m = month + 12 a - 2
+' For Julian calendar:  day = ( 5 + date + y + [ y / 4 ] + [ 31 m / 12 ] ) mod 7
+' For Gregorian calendar:  day = ( date + y + [ y / 4 ] - [ y / 100 ] + [ y / 400 ] + [ 31 m / 12 ] ) mod 7
+' 0 = Sunday, 1 = Monday, 2 = Tuesday, 3 = Wednesday, etc...
+	Dim a , y , m , d As Integer
+	a = Fix ( ( ( 14 - Month ( Now ) ) / 12 ) )
+	y = Year ( Now ) - a
+	m = Month ( Now ) + ( 12 * a )  - 2 
+	d = ( Day ( Now ) + y + Fix ( y / 4 ) - Fix ( y / 100 ) + Fix ( y / 400 ) + Fix ( ( 31 * m ) / 12 ) ) Mod 7	
+	dayOfTheWeek = d	
+End Function
+
+
+
+
+Function isLeapYear ( vYear )
+	
+	' vYear := 2000 ;
+	' leapYear := @If ( @Modulo ( vYear ; 4 ) = 0 & @Modulo ( vYear ; 100 ) != 0 | @Modulo ( vYear ; 400 ) = 0; @True ; @False ) ;
+	
+	' function LeapYear(vYear) {
+		' if ( ( (vYear%4 == 0)&&(vYear%100 != 0) ) || (vYear%400 == 0) ) {
+			' return true;
+		' } else {
+			' return false;
+		' }
+	' }
+	
+	If ( ( ( vYear Mod 4 = 0 ) And ( vYear Mod 100 <> 0 ) ) Or ( vYear Mod 400 = 0 ) ) Then
+		isLeapYear = True
+	Else
+		isLeapYear = False
+	End If
+End Function
+
+
+
+
+
+Function LastDayOfMonth ( thisval As String )
+	Dim thisMonth As New NotesDateTime ( Cstr ( thisval ) )
+	If Cint ( Month ( Cdat ( thisMonth.DateOnly ) ) ) <> 12 Then
+		nam_dt = ( Month ( thisMonth.DateOnly ) +1) & "/01/" & Year ( thisMonth.DateOnly )
+	Else
+		nam_dt = "01/01/" & ( Year ( thisMonth.DateOnly ) + 1) 
+	End If 
+	Set lastday_dt = New NotesDateTime ( nam_dt )
+	Call lastday_dt.AdjustDay ( -1 ) 	
+	Set LastDayOfMonth = lastday_dt
+End Function
+
+
+
+
+Sub SimpleCounter
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim view As NotesView
+	Dim key(0) As String
+	Set doc = s.DocumentContext
+	If doc.Version(0) = "Production" Then
+		Set db = doc.ParentDatabase
+		Set view = db.getView ( "vAdminUNID" )
+		key(0) = doc.UniversalID
+		doc.Count = Cint ( doc.Count(0) ) + 1
+		Call doc.Save ( True , True )
+	End If
+End Sub

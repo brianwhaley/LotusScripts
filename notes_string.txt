@@ -1,0 +1,283 @@
+Option Public
+Option Declare
+
+
+Function ReplaceSubstring ( thisString As String, strFrom As String, strTo As String ) As String
+     ' Replace instances of strFrom to strTo in thisString
+	Dim strResult As String
+	Dim i As Integer
+	Dim strFromLength As Integer
+	Dim strResultLength As Integer
+	i = 0
+	strFromLength = Len ( strFrom )
+	strResult = thisString
+	Do While( i < Len ( strResult ) )
+		i = i + 1
+		If Mid$ ( strResult , i , strFromLength ) = strFrom Then
+			strResultLength = Len ( strResult )
+			strResult = Left$ ( strResult, ( i - 1) ) + strTo + Right$ ( strResult , strResultLength - ( ( i - 1) + ( strFromLength ) ) )
+		End If
+	Loop
+	ReplaceSubstring = strResult
+End Function
+
+
+
+
+
+Function UIUBound ( field As String ) 
+     'UIUBound returns the number of carriage returns in a multi-value text field 
+	Dim w As New NotesUIWorkspace
+	Dim uidoc As NotesUIDocument
+	Dim count As Integer
+	Dim i As Integer
+	Dim s As String
+	Dim char As String
+	Set uidoc = w.CurrentDocument
+	s = uidoc.fieldGetText ( field )
+	count = 0
+	For i = 1 To Len ( s ) 
+		char = Mid$ ( s , i , 1 )
+		If char = Chr$(10) Then
+			count = count + 1
+		End If
+	Next
+	UIUBound = count
+End Function
+
+
+
+
+Function VariantToString ( v As Variant )
+	Dim s As String
+	Dim i As Integer
+	s = ""
+	For i = 0 To Ubound ( v )
+		If i = 0 Then
+			s = s + Cstr ( v ( i ) )
+		Else
+			s = s + ";" + Cstr ( v ( i ) )
+		End If
+	Next
+	VariantToString = s
+End Function
+
+
+
+
+Function StringToArray ( s As String )
+	Redim v(0) As String
+	Dim char , stringBit As String
+	Dim i , k , count , begin , length As Integer
+	count = 0
+	begin = 1
+	length = 0
+	For i = 1 To Len ( s ) 
+		char = Mid$ ( s , i , 1 )
+		If char = Chr$(10) Or char = ";" Or i = Len ( s ) Then
+			If i = Len ( s ) Then
+				length = i - begin + 2
+			Elseif char = ";" Then
+				length = i - begin + 1
+			Else
+				length = i - begin
+			End If
+			If count <> 0 Then Redim Preserve v ( count ) As String
+			stringBit = Mid$ ( s , begin , length - 1 )
+			If stringBit = "" Then stringBit = "*"
+			v ( count ) = Trim$ ( stringBit )
+			count = count + 1
+			begin = i + 1               
+		End If
+	Next
+	StringToArray = v
+End Function
+
+
+
+
+
+Sub AsciiCharacters
+	Dim characters As String
+	Dim i As Variant
+	Dim chkString , char , newString As String
+	For i = 1 To 255
+		characters = characters + "Chr(" + i + ")=" + Chr ( i ) + ", "
+	Next
+	Messagebox ( characters )
+	chkString = Inputbox ( "What character(s) do you want the ASCII #(s) of?")
+	If Len ( chkString ) > 0 Then
+		For i = 1 To Len ( chkString )
+			char = Mid$ ( chkString , i , 1 )
+			newString = newString + char + " = Chr(" + Cstr ( Asc ( char ) ) + ")" + Chr(10)
+		Next
+		Messagebox ( newString )
+	Else
+		Messagebox ( "You have not entered a string." + Chr(10) + "This function is being cancelled." )
+	End If
+End Sub
+
+
+
+
+Function dayOfTheWeek	
+' a = [ ( 14 - month ) / 12 ]
+' y = year - a
+' m = month + 12 a - 2
+' For Julian calendar:  day = ( 5 + date + y + [ y / 4 ] + [ 31 m / 12 ] ) mod 7
+' For Gregorian calendar:  day = ( date + y + [ y / 4 ] - [ y / 100 ] + [ y / 400 ] + [ 31 m / 12 ] ) mod 7
+' 0 = Sunday, 1 = Monday, 2 = Tuesday, 3 = Wednesday, etc...
+	Dim a , y , m , d As Integer
+	a = Fix ( ( ( 14 - Month ( Now ) ) / 12 ) )
+	y = Year ( Now ) - a
+	m = Month ( Now ) + ( 12 * a )  - 2 
+	d = ( Day ( Now ) + y + Fix ( y / 4 ) - Fix ( y / 100 ) + Fix ( y / 400 ) + Fix ( ( 31 * m ) / 12 ) ) Mod 7	
+	dayOfTheWeek = d	
+End Function
+
+
+
+
+Function isLeapYear ( vYear )
+	' vYear := 2000 ;
+	' leapYear := @If ( @Modulo ( vYear ; 4 ) = 0 & @Modulo ( vYear ; 100 ) != 0 | @Modulo ( vYear ; 400 ) = 0; @True ; @False ) ;
+	
+	' function LeapYear(vYear) {
+		' if ( ( (vYear%4 == 0)&&(vYear%100 != 0) ) || (vYear%400 == 0) ) {
+			' return true;
+		' } else {
+			' return false;
+		' }
+	' }
+	If ( ( ( vYear Mod 4 = 0 ) And ( vYear Mod 100 <> 0 ) ) Or ( vYear Mod 400 = 0 ) ) Then
+		isLeapYear = True
+	Else
+		isLeapYear = False
+	End If
+End Function
+
+
+
+
+Function LastDayOfMonth ( thisval As String )
+	Dim thisMonth As New NotesDateTime ( Cstr ( thisval ) )
+	Dim lastday_dt As NotesDateTime
+	Dim nam_dt As String
+	
+	If Cint ( Month ( Cdat ( thisMonth.DateOnly ) ) ) <> 12 Then
+		nam_dt = ( Month ( thisMonth.DateOnly ) +1) & "/01/" & Year ( thisMonth.DateOnly )
+	Else
+		nam_dt = "01/01/" & ( Year ( thisMonth.DateOnly ) + 1) 
+	End If 
+	Set lastday_dt = New NotesDateTime ( nam_dt )
+	Call lastday_dt.AdjustDay ( -1 ) 	
+	Set LastDayOfMonth = lastday_dt
+End Function
+
+
+
+
+
+Sub RemoveCharactersColl
+	Dim s As New NotesSession
+	Dim ws As New NotesUIWorkspace
+	Dim db As NotesDatabase
+	Dim coll As NotesDocumentCollection
+     'Dim view As NotesView
+	Dim doc As NotesDocument
+	Dim rtitem As Variant
+	Dim i As Integer
+	Dim x As Integer
+	Dim rttext, rtlength, char, newstring As String
+	Set db = s.GetDatabase( "", "JokeMail.nsf" )
+     'Set view = db.GetView("($All)")
+     'Set doc = view.GetFirstDocument
+	Set coll = db.Search( "Form = ""Memo""" , Nothing , 0 )
+	For i = 1 To coll.count
+		Set doc = coll.getNthDocument ( i )
+		newstring = ""
+		rttext = doc.GetFirstItem("Body").Text
+		rtlength = Len ( rttext )
+		If rtlength > 0 Then
+			For x = 1 To rtlength
+				char = Mid$ ( rttext , x , 1 )
+				If char = Chr$(62) Then ' OMIT >
+				Elseif char = Chr(32) And  Mid$ ( rttext , x + 1 , 1 ) = Chr(32) Then ' OMIT EXTRA SPACES
+				Else
+					newstring = newstring + char
+				End If
+			Next
+			doc.Body = newstring
+			Call doc.save (True,True)
+		End If
+		' Print PercentComplete ( 100 , Cdbl ( i ) , Cdbl ( coll.Count ) )
+	Next
+End Sub
+
+
+
+
+
+Function getColumnValues ( thisDB As NotesDatabase , thisView As NotesView , _
+thisCol As Integer , thisArray() As Variant )
+	Dim doc As NotesDocument
+	Dim thisVal As Variant
+	Dim thisOtherVal As Variant
+	Dim k As Integer
+	Set doc = thisView.GetFirstDocument   
+	While Not ( doc Is Nothing )         
+		thisVal = doc.ColumnValues ( thisCol )
+		If Isarray ( thisVal ) Then
+			For k = Lbound ( thisVal ) To Ubound ( thisVal ) 
+				thisOtherVal = thisVal ( k )
+				If isUniqueValueInArray ( thisOtherVal , thisArray() ) Then
+					If Len ( thisArray ( 0 ) ) > 0 Then 
+						Redim Preserve thisArray ( Ubound ( thisArray ) + 1 ) As Variant
+					End If
+					thisArray ( Ubound ( thisArray ) ) = thisOtherVal
+				End If
+			Next
+		Else
+			If isUniqueValueInArray ( thisVal , thisArray() ) Then
+				If Len ( thisArray ( 0 ) ) > 0 Then 
+					Redim Preserve thisArray ( Ubound ( thisArray ) + 1 ) As Variant
+				End If
+				thisArray ( Ubound ( thisArray ) ) = thisVal
+			End If
+		End If
+		Set doc = thisView.GetNextDocument( doc )
+	Wend   
+End Function
+
+
+
+
+
+Function isUniqueValueInArray ( needle As Variant , haystack() As Variant )
+	Dim m As Integer
+	isUniqueValueInArray = True
+	For m = Lbound ( haystack ) To Ubound ( haystack ) 
+		If haystack ( m ) = needle Then
+			isUniqueValueInArray = False
+			Exit Function
+		End If
+	Next
+End Function
+
+
+
+
+Function ProperCase ( InString As Variant )
+	Dim outstring As String 
+	Dim n As Integer
+	OutString = Lcase ( Trim ( InString ) )
+	If OutString <> "" Then 
+		Mid ( OutString , 1 , 1 ) = Ucase ( Mid ( OutString , 1 , 1 ) ) 
+		n% = Instr ( OutString , " " )
+		While n% > 0 And n% < Len ( OutString )
+			Mid ( OutString , n% + 1 , 1 ) = Ucase ( Mid ( OutString , n% + 1 , 1 ) )
+			n% = Instr ( n% + 1 , OutString , " " )
+		Wend
+	End If
+	ProperCase = OutString
+End Function 

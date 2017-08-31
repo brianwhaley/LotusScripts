@@ -1,0 +1,31 @@
+Option Public
+Option Explicit
+
+
+
+
+Dim s As NotesSession
+Dim db As NotesDatabase
+Dim coll As NotesDocumentCollection
+Dim agent As NotesAgent
+Dim view As NotesView
+Dim doc As NotesDocument
+Dim item As NotesItem
+Dim searchFormula As String
+Dim bday As NotesDateTime
+Dim i As Integer
+
+
+
+
+
+Sub Initialize
+	Set s = New NotesSession
+	Set agent = s.CurrentAgent
+	Set doc=s.DocumentContext
+	Set db = doc.ParentDatabase
+	Set view = db.GetView ( "" )
+	Set bday = New NotesDateTime ( "01/22/1973" )
+	searchFormula$ = "Form = '" + doc.Form(0) + "' & RecordNumber = ''  "
+	Set coll = db.Search ( searchFormula$ , bday, 0 )
+End Sub

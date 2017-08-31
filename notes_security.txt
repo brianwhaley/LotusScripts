@@ -1,0 +1,278 @@
+Option Public
+Option Declare
+
+
+
+
+
+Sub LockDocument
+     ' PostMode Change :
+     ' Call LockDocument
+	Dim s As New NotesSession
+	Dim w As New NotesUIWorkspace
+	Dim uidoc As notesuidocument
+	Dim doc As NotesDocument
+	Set uidoc = w.currentdocument
+	Set doc = uidoc.document
+	If uidoc.editmode Then
+		doc.inUse = s.CommonUserName
+		Call doc.save (True , True )
+	End If
+End Sub
+
+
+
+
+Function LockCheck
+     ' QueryModeChange :
+     ' If LockCheck = True Then Continue = False     
+	LockCheck = False
+	Dim w As New NotesUIWorkspace
+	Dim uidoc As notesuidocument
+	Set uidoc = w.currentdocument
+	If uidoc.editmode = False Then
+		If uidoc.fieldgettext ( "inUse" ) <> "" Then
+			Messagebox ( "This document is already open by " + uidoc.fieldgettext ( "inUse" ) + ".  Please Try again later")
+			LockCheck = True
+		End If
+	End If
+End Function
+
+
+
+
+Sub UnlockDocument
+     ' QueryClose :
+     ' Call UnlockDocument
+	Dim s As New NotesSession
+	Dim w As New NotesUIWorkspace
+	Dim uidoc As notesuidocument
+	Dim doc As NotesDocument
+	Set uidoc = w.currentdocument
+	Set doc = uidoc.document
+	If doc.inUse(0) <> "" Then
+		doc.inUse = ""
+		Call doc.save (True , True )
+	End If
+End Sub
+
+
+
+
+Sub NoEditFromView ( Source As Notesuidocument , Mode As Integer , Isnewdoc As Variant , Continue As Variant )
+	
+     ' PUT THIS LINE IN THE QUERYMODECHANGE OF THE DOCUMENT
+     ' Call NoEditFromView ( Source , Mode , Isnewdoc , Continue )
+	
+	If Isnewdoc Then          
+		Continue = True
+	Elseif Mode = 1  Then
+		Messagebox ( "Editing a document from a view is not permitted.")
+		continue = False
+	End If
+	
+End Sub
+
+
+
+
+Function EditorAccess
+	
+	Dim w As New NotesUIWorkspace
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim nab_view As NotesView
+	Dim doc , GroupDoc As NotesDocument
+	Dim uidoc As NotesUIDocument
+	Dim Editors , docAuthor As Variant 
+	Dim group , member , memberList As String
+	Dim i , k As Integer
+	
+	Set uidoc = w.CurrentDocument
+	Set db = s.CurrentDatabase
+	Dim nab_db As New NotesDatabase ( db.Server , "names.nsf" )
+	Set nab_view = nab_db.GetView ("Groups") 
+	Set doc = uidoc.document
+	Editors = doc.Editors
+	docAuthor = doc.Creator
+	EditorAccess = False
+	
+	For i = 0 To Ubound ( Editors )
+		If Instr ( 1 , Editors ( i ) , s.CommonUserName ) > 0 Then
+			EditorAccess = True
+			Exit For               
+		End If
+	Next
+	
+	If EditorAccess = False Then
+		For i = 0 To Ubound ( Editors )
+			If EditorAccess = False Then
+				Set GroupDoc = nab_view.getdocumentbykey ( Editors ( i ) )
+				If Not ( GroupDoc Is Nothing ) Then    
+					group = GroupDoc.GetItemValue("ListName")
+					member = GroupDoc.GetItemValue("Members")
+					For k = 0 To Ubound ( member )
+						If k = 0 Then
+							memberList = member ( k )
+						Else 
+							memberList = memberList & "," & member ( k )
+						End If
+						If Instr ( 1 , memberList , s.CommonUserName ) > 0 Then
+							EditorAccess = True
+						End If   
+					Next  
+				End If
+			End If
+		Next
+	End If
+	
+	
+	If EditorAccess = True Then     
+          'Continue = True          
+	Else               
+		Messagebox ( "You are not authorized to edit this document." )
+          'Continue = False
+	End If 
+	
+	
+	
+End Function
+
+
+
+
+Function CheckAccess ( groupname() As String )
+	CheckAccess = False
+	Dim w As New NotesUIWorkspace
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim view As NotesView
+	Dim acl As NotesACL
+	Dim entry As NotesACLEntry
+	Dim doc, otherDoc As NotesDocument
+	Dim uidoc As NotesUIDocument
+	Dim memberList As String
+	Dim group , member As Variant
+	Dim y , z As Integer
+	Set uidoc = w.CurrentDocument
+	Set db = s.CurrentDatabase
+	Set acl = db.ACL
+	Dim otherDB As  New NotesDatabase ( db.Server , "names.nsf" )          
+	Set view = otherDB.GetView ("Groups")
+	z = 0  
+	Do While z < Ubound ( groupname ) + 1
+		Set otherDoc = view.GetDocumentByKey ( groupname ( z ) )     
+		group = otherDoc.GetItemValue ( "ListName" )
+		member = otherDoc.GetItemValue ( "Members" )
+		memberList = ""
+		For y = 0 To Ubound ( member )
+			If y = 0 Then
+				memberList = member(y)
+			Else 
+				memberList = memberList & "," & member ( y )
+			End If
+		Next          
+		If Instr ( 1 , memberList , s.CommonUserName ) > 0 Then
+			CheckAccess = True    
+			Exit Do
+		End If    
+		z = z + 1
+	Loop    
+End Function
+
+
+
+
+
+Sub HowToPreventEscape
+	
+     ' ********** PUT THIS IN THE POSTOPEN
+     'Dim s As New notessession
+     'Call s.SetEnvironmentVar ( "NoEscapeCL" , "Yes" )
+	
+     ' ********** PUT THIS IN THE QUERYCLOSE
+     'Dim s As New NotesSession
+     'esc = s.GetEnvironmentString ( "NoEscapeCL" )
+     'If esc = "Yes" Then
+     '     continue = False
+     '     Messagebox ( "Please click on the Back or Exit button to close this document")
+     'End If
+	
+     ' ********** PUT THIS IN THE BUTTON OR HOTSPOT
+     ' @SetEnvironment("NoEscape" ; "" ) ;
+	
+End Sub
+
+
+
+
+Public Function hasRole( Role As String ) As Integer
+'Function returns true if the current user has the [role] 'Role'
+	Dim userroles As Variant
+	hasRole = False
+	UserRoles = Evaluate( "@UserRoles" )
+	Forall entry In UserRoles
+		If entry = Role Then
+			hasRole = True
+			Exit Function
+		End If
+	End Forall
+End Function
+
+
+
+
+
+Sub LockView ( continue As Integer )
+     ' Insert into the queryOpen of the View
+     ' Call LockView ( continue ) 
+	Dim pwd As String
+	pwd = Inputbox$ ( "Enter the password required to use this view", "Password" )
+	If Ucase ( pwd ) = "BELLCORE" Then
+		continue = True
+	Else
+		Msgbox "Wrong Password. You do not need to use this view.", 0 + 16, "Unauthorized Access"
+		continue = False
+	End If
+End Sub
+
+
+
+
+
+Function LockCheckOutside ( doc As NotesDocument )
+	LockCheckOutside = False
+	Dim w As New NotesUIWorkspace
+	If doc.inUse (0) <> "" Then
+		Messagebox ( "This document is already open by " + doc.inUse (0) + ".  Please Try again later")
+		LockCheckOutside = True
+	End If
+End Function
+
+
+
+
+Sub LockDocumentOutside ( doc As NotesDocument )
+	Dim s As New NotesSession
+	doc.inUse (0) = s.CommonUserName
+	Call doc.save (True , True )
+End Sub
+
+
+
+
+Sub UnlockDocumentOutside ( doc As NotesDocument )
+	If doc.inUse (0) <> "" Then
+		doc.inUse (0) = ""
+		Call doc.save (True , True )
+	End If
+End Sub
+
+
+
+
+Sub AnonymousNoAccess
+	' Create new Person named Anonymous in ACL
+	' Give Anonymous No Access
+	' This will force everyone to log in
+End Sub

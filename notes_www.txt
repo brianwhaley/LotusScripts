@@ -1,0 +1,573 @@
+Sub WebSearch
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim searchview As NotesView
+	Dim viewDoc As NotesDocument
+	Dim fieldvalue As Variant
+	Dim resultDoc As NotesDocument
+	Dim docID As String
+	Dim NewEntry As String
+	Dim searchstring As String
+	Dim varSiteLink As Variant
+	Dim varSiteInfo As Variant
+	Dim varFormName As Variant
+	Dim i As Integer
+	Dim resultDocBody As NotesRichTextItem
+	
+	Set doc=s.DocumentContext
+	Set db = s.CurrentDatabase
+	fieldvalue = doc.getitemvalue("QueryString")
+	searchstring = |"| & fieldvalue(0) & |"|
+	Set resultDoc = db.CreateDocument
+	Set resultDocBody = resultDoc.CreateRichTextItem("body")
+	Call resultDoc.ReplaceItemValue("Form", "S_Result")
+	Set searchview = db.GetView("All")     
+	i = searchview.FTSearch(searchstring,0)
+	Call resultDoc.ReplaceItemValue("NumFound", i)
+	Call resultDoc.ReplaceItemValue("SearchCriteria",searchstring) 
+	
+	Call resultDocBody.AppendText("[<Table>")     
+	
+	For i = 1 To i
+		Set viewdoc = searchview.GetNthDocument(i)
+		varFormName = viewDoc.GetItemValue("form")
+		varSiteInfo = viewDoc.GetItemValue("name")
+		varSiteLink = viewDoc.GetItemValue("url_Views")  
+		varSiteLink="<a href=" + varSiteLink(0) + ">" + varSiteLink(0)  + "</a>"
+		
+		NewEntry = "</td>"
+		NewEntry = NewEntry + "<td valign=top>" + varFormName(0) + "</td>"
+		NewEntry = NewEntry + "<td valign=top><font color=red> || </font></td>"
+		NewEntry = NewEntry + "<td valign=top>" + varSiteInfo(0) + "</td>"
+		NewEntry = NewEntry + "<td valign=top><font color=red> || </font></td>"
+		NewEntry = NewEntry + "<td valign=top>" + varSiteLink + "</td></tr>"
+		
+		Call resultDocBody.AppendText("<tr><td valign=top>")
+		Call resultDocBody.AppendDocLink(viewDoc, "Open Document") 
+		Call resultDocBody.AppendText(NewEntry)
+		
+	Next 
+	
+	Call resultDocBody.AppendText("</table>]")
+	
+	Call resultDoc.Save (False, False)
+	
+     'Return the resultDoc to the browser'
+	Print "[" & db.filepath & "/vwSearch/"&resultDoc.UniversalID & "?OpenDocument]"
+End Sub
+
+
+
+
+
+
+
+
+Sub mailForm
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim maildoc As NotesDocument
+	Dim rtitem As NotesRichTextItem
+	Dim addString As String
+	Dim returnString As String
+	Dim server_name As String
+	Set doc = s.DocumentContext
+	Set db = doc.ParentDatabase
+	server_name = Right$ ( Cstr ( db.Server ) , Cint ( Len ( Cstr ( db.Server ) ) ) - 3 )
+	server_name = Left$ ( Cstr ( server_name ) , Cint ( Instr ( Cstr ( server_name )  , "/" ) ) - 1 )
+	Set mailDoc = db.CreateDocument ( )
+	Set mailDoc = New NotesDocument ( db ) 
+	' =====================================================================================
+	mailDoc.Form = "Memo"
+	mailDoc.SendTo = doc.SendTo
+	If ( doc.Subject(0) <> "" ) Then
+		mailDoc.Subject = doc.Subject(0)
+	Else
+		mailDoc.Subject = doc.Form(0)
+	End If
+	mailDoc.Principal = doc.ReplyTo(0) + " "
+	'mailDoc.ReplyTo = doc.ReplyTo
+	'mailDoc.From = doc.ReplyTo
+	'mailDoc.SendFrom = doc.ReplyTo
+	'mailDoc.PostedDate = Now()
+	'mailDoc.ComposedDate = Now()
+	'mailDoc.DeliveredDate = Now()
+	'mailDoc.EncryptOnSend = False
+	
+	Set rtitem = mailDoc.createRichTextItem("Body")
+	addString = ""
+	'  ===== SEND E-MAIL WITH FIELD NAME AND VALUE COMBINATIONS =====
+	If doc.SaveOptions(0) = "0" Then
+		Forall item In doc.items
+			addString = addString + item.Name + " = " + item.Text + Chr(10)
+		End Forall	
+	Else
+	'  ===== SEND E-MAIL WITH LINK TO SAVED DOCUMENT =====
+		addString = addString + "A " + doc.Form(0) + " has been submitted." + Chr(10)
+		addString = addString + "Click on the URL below to review the document." + Chr(10)
+		addString = addString + "http://" + server_name + ".bms.com" + "/" + db.FilePath + "/0/" + doc.UniversalID + "?Open&Login"
+	End If
+	Call rtitem.AppendText ( addString )
+	mailDoc.SaveMessageOnSend = False
+	Call mailDoc.send ( False )
+     ' =====================================================================================
+	If doc.redirect(0) <> "" Then 
+	'  ===== ADDS REDIRECT OPTION TO FORM =====
+		Print "[" + doc.redirect(0) + "]"
+	Else 
+	' ===== PRINT RESULTS TO WEB PAGE ======
+		returnString = "<center><font size=4 face=arial><b>Thank you for submitting this form.<br>" + Chr(10)
+		returnString = returnString + "Here is what you submitted : </b></font><br><hr width=600>"  + Chr(10)
+		returnString = returnString + "<table border=1 width=450>" + Chr(10) 
+		Forall item In doc.items
+			returnString = returnString + "<tr><td bgcolor=#1860AB><font size=2 face=arial color=white><b>" + item.Name + "&nbsp;</td>"
+			returnString = returnString + "<td><font size=2 face=arial>" + item.Text + "&nbsp;</td></tr>" + Chr(10)
+		End Forall
+		returnString = returnString + "</table>"  + Chr(10)
+		Print returnString
+	End If
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sub mailFormApprovals
+	
+' ASSOCIATED FIELDS
+' ==================
+' SendTo - the e-mail addresses of administrators who will receive the auto generated confirmation e-mail 
+	
+' ReplyTo - the e-mail address that people should reply to from the auto generated confirmation e-mail 
+	
+' Subject - text field containing the subject of the confirmation e-mail to be sent.  
+'                This can be a hiden field.  
+	
+' EMailAddress - the e-mail address of the submitter.  They will receive a confirmation of their submission 
+'                          if this field exists and is not blank
+	
+' SaveOptions - if form is not saved, all fields will be sent, otherwise a confirm e-mail with a link will be sent
+	
+' Redirect - if used, the redirect field needs to resolve to an absolute URL containing "http://"
+'                 otherwise the "Thank You" page with field ames and values will be displayed
+	
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim statusMaildoc As NotesDocument
+	Dim approveMaildoc As NotesDocument
+	Dim completeMaildoc As NotesDocument
+	Dim rejectMailDoc As NotesDocument
+	Dim rtitem As NotesRichTextItem
+	Dim returnString As String
+	Dim SendToStatus() As String
+	Dim SendToApprove() As String
+	Dim SendToComplete() As String
+	Dim pos As Integer
+	Dim s As New NotesSession
+	Set doc=s.DocumentContext
+	Set db = doc.ParentDatabase
+	pos = Cint ( Cstr ( doc.approvalPosition(0) ) )
+	
+	' ##### CALCULATE SENDTO FIELD
+	Dim i As Integer
+	Redim Preserve SendToStatus(0) As String
+	SendToStatus(0) = doc.EMailAddress(0)
+	For i = 0 To Ubound ( doc.approvals )
+		If i < pos Then
+			Redim Preserve SendToStatus ( Ubound ( SendToStatus ) + 1 ) As String
+			SendToStatus ( Ubound ( SendToStatus ) ) = doc.approvals ( i ) 
+		Elseif i = pos Then
+			Redim Preserve SendToApprove ( 0 ) As String
+			SendToApprove ( 0 ) = doc.approvals ( i ) 
+		Elseif i > pos Then
+		End If
+	Next
+	
+	If doc.formStatus(0) = "approved" Then
+		' ##### SEND STATUS EMAIL
+		Dim addString As String	
+		Set statusMailDoc = db.CreateDocument()
+		Set statusMailDoc = New NotesDocument ( db ) 	
+		statusMailDoc.Form = "Memo"
+		statusMailDoc.SendTo = SendToStatus
+		statusMailDoc.From = Cstr ( doc.approvalFinal(0) ) + "@NotesDomain"
+		statusMailDoc.SendFrom = Cstr ( doc.approvalFinal(0) ) + "@NotesDomain"
+		statusMailDoc.ReplyTo = Cstr ( doc.approvalFinal(0) ) + "@NotesDomain"
+		statusMailDoc.Principal = Cstr ( doc.approvalFinal(0) ) + "@NotesDomain"
+		statusMailDoc.PostedDate = Now()
+		statusMailDoc.ComposedDate = Now()
+		statusMailDoc.DeliveredDate = Now()
+		statusMailDoc.EncryptOnSend = False
+		statusMailDoc.Subject = doc.Form(0)
+		Set rtitem = statusMailDoc.createRichTextItem("Body")
+		addString = ""
+		addString = addString + "Your " + doc.form(0) + " form has been sent to " + Chr(10)
+		If pos <= Ubound ( doc.approvals ) Then
+			addString = addString + doc.approvals ( pos ) + " for their approval."
+		Elseif pos > Ubound ( doc.approvals ) Then
+			addString = addString + "its final destination to be processed."
+		End If
+		Call rtitem.AppendText ( addString )
+		statusMailDoc.SaveMessageOnSend = False
+		Call statusMailDoc.send ( False , SendToStatus )
+		
+		If pos <= Ubound ( doc.approvals ) Then
+			' ##### SEND APPROVE EMAIL
+			Set approveMailDoc = db.CreateDocument ( )
+			Set approveMailDoc = New NotesDocument ( db ) 	
+			approveMailDoc.Form = "Memo"
+			approveMailDoc.SendTo = SendToApprove
+			approveMailDoc.From = Cstr ( doc.approvalFinal(0) ) + "@NotesDomain"
+			approveMailDoc.ReplyTo = Cstr ( doc.approvalFinal(0) ) + "@NotesDomain"
+			approveMailDoc.Principal = Cstr ( doc.approvalFinal(0) ) + "@NotesDomain"
+			approveMailDoc.Subject = doc.Form(0)
+			Set rtitem = approveMailDoc.createRichTextItem("Body")
+			addString = ""
+			addString = addString + doc.formName(0) + Chr(10) + Chr(10) 
+			addString = addString + SendToApprove(0) + Chr(10) + Chr(10) 
+			addString = addString + "There is a " + doc.Form(0) + " submitted by " + doc.Name(0) + " for your approval.  " 
+			addString = addString + "Please click on the URL below and review the form submission.  "  
+			addString = addString + "If you approve the submission, click on the 'I Approve' button.  " 
+			addString = addString + "If you do not approve of the submission, click on the 'I Do Not Approve' button "
+			addString = addString + "and notify the submitter via e-mail why you have denied their request." + Chr(10)
+			addString = addString + Chr(10)
+			addString = addString + "The URL for this submission is :" + Chr(10)
+			addString = addString + "http://domino1/cs/forms.nsf/all/" + doc.UniversalID + "?Edit"
+			Call rtitem.AppendText ( addString )
+			approveMailDoc.SaveMessageOnSend = False
+			Call approveMailDoc.send ( False )
+			
+		Elseif pos > Ubound ( doc.approvals ) Then
+			' ##### SEND COMPLETE EMAIL
+			Set completeMailDoc = db.CreateDocument ( )
+			Set completeMailDoc = New NotesDocument ( db ) 	
+			completeMailDoc.Principal = doc.approvalFinal(0) + "@NotesDomain"
+			completeMailDoc.Form = "Memo"
+			completeMailDoc.SendTo = doc.approvalFinal
+			completeMailDoc.Subject = doc.Form(0)
+			Set rtitem = completeMailDoc.createRichTextItem("Body")
+			addString = "This document has been approved by all of the necessary people" +  Chr(10) 
+			addString = addString + Chr(10)
+			addString = addString + "The URL for this submission is :" + Chr(10)
+			addString = addString + "http://domino1/cs/forms.nsf/all/" + doc.UniversalID + "?Edit"
+			addString = addString + Chr(10)+ Chr(10)
+			Forall item In doc.items
+				addString = addString + item.Name + " = " + item.Text + Chr(10)
+			End Forall		
+			Call rtitem.AppendText ( addString )
+			completeMailDoc.SaveMessageOnSend = False
+			Call completeMailDoc.send ( False )
+			
+		End If
+		pos = pos + 1
+		doc.approvalPosition = Cstr ( pos )
+		Call doc.save ( True , True )
+	Elseif doc.formStatus(0) = "disapproved" Then
+		' ### SEND REJECTION EMAIL
+		Set rejectMailDoc = db.CreateDocument ( )
+		rejectMailDoc.Form = "Memo"
+		rejectMailDoc.SendTo = doc.EMailAddress(0)
+	' rejectMailDoc.CopyTo = doc.approvals	
+		rejectMailDoc.CopyTo = SendToStatus
+		rejectMailDoc.From = Cstr ( doc.approvalFinal(0) ) + "@NotesDomain"
+		rejectMailDoc.ReplyTo = Cstr ( doc.approvalFinal(0) ) + "@NotesDomain"
+		rejectMailDoc.Principal = Cstr ( doc.approvalFinal(0) ) + "@NotesDomain"	
+		rejectMailDoc.Subject = doc.Form(0)
+		Set rtitem = rejectMailDoc.createRichTextItem("Body")
+		addString = ""
+		addString = addString + "The " + doc.form(0) + " form for " + doc.Name(0) + " has been returned because " + Chr(10)
+		addString = addString + "one of your approvers, " + doc.approvals ( Cint ( doc.approvalPosition(0) ) -1 ) + " has disapproved of the content." + Chr(10)
+		addString = addString + "Please contact your approvers for more details." + Chr(10)
+		addString = addString + Chr(10)
+		addString = addString + "The URL for this submission is :" + Chr(10)
+		addString = addString + "http://domino1/cs/forms.nsf/all/" + doc.UniversalID + "?Edit"
+		Call rtitem.AppendText ( addString )
+		rejectMailDoc.SaveMessageOnSend = False
+		Call rejectMailDoc.send ( False )
+		
+		doc.approvalPosition = "0"
+		doc.formStatus = "approved"
+		Call doc.save ( True , True )
+	End If
+	If doc.redirect(0) <> "" Then 
+	'  ===== ADDS REDIRECT OPTION TO FORM =====
+		Print "[" + doc.redirect(0) + "]"
+	Else 
+		' ##### PRINT RETURN STRING #####
+		returnString = "<center><font size=4 face=arial><b>Thank you for submitting this form.<br>" + Chr(10)
+		returnString = returnString + "Here is what you submitted : </b></font><br><hr width=600>"  + Chr(10)
+		returnString = returnString + "<table border=1 width=450>" + Chr(10) 
+		Forall item In doc.items
+			returnString = returnString + "<tr><td bgcolor=#1860AB><font size=2 face=arial color=white><b>" + item.Name + "&nbsp;</td>"
+			returnString = returnString + "<td><font size=2 face=arial>" + item.Text + "&nbsp;</td></tr>" + Chr(10)
+		End Forall
+		returnString = returnString + "</table>"  + Chr(10)
+		Print returnString
+	End If
+	
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sub Redirect
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim dc As NotesDocumentCollection
+	Dim doc As NotesDocument
+	Dim context As NotesDocument
+	Dim arg , pageStr As String
+	Dim pos As Integer
+	Set context = s.DocumentContext
+	Set db = s.CurrentDatabase
+	arg = s.DocumentContext.Query_String(0)
+	pos = Instr ( arg , "&" ) 
+	arg = Mid$ ( arg , pos + 1 )
+	pos = Instr ( arg , "=" ) 
+	arg = Mid$ ( arg , pos + 1 )
+	Print "[http://cs.bms.com/cs/cs.nsf/index.html?OpenFrameSet" + _
+	"&Frame=body&Src=/cs/cs.nsf/SiteMap/" + arg + "?OpenDocument]"
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+Sub RecordNumber
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim view As NotesView
+	Dim agent As NotesAgent
+	Dim doc As NotesDocument
+	Dim viewDoc As NotesDocument
+	Dim lastRecordNum As Integer
+	Dim i As Integer	
+	Set doc = s .DocumentContext
+	Set db = doc.ParentDatabase
+	lastRecordNum = 0
+	If doc.isNewNote Or doc.RecordNumber(0) = "" Then	
+		Set view = db.getView ( doc.Form(0) + "_rec_num" )
+		Set viewDoc = view.getlastdocument
+		Do While lastRecordNum = 0
+			If ( Not ( viewDoc Is Nothing ) ) Then
+				If( Not ( viewDoc.IsDeleted ) ) Then
+					If ( Cstr ( viewDoc.RecordNumber(0) ) <> "" ) Then
+						If Cint ( Cstr ( viewDoc.RecordNumber ( 0 ) ) ) > Cint ( lastRecordNum ) Then
+							lastRecordNum = Cint ( viewDoc.RecordNumber ( 0 ) )  + 1
+						End If
+					End If	
+				End If
+				Set viewDoc = view.getPrevDocument ( viewDoc )
+			Else
+				lastRecordNum = 1
+			End If
+		Loop		
+		doc.RecordNumber = lastRecordNum
+		Call doc.Save ( True , True )
+	End If	
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+Sub PersonInfo
+		' window..open('/cs/cs.nsf/person-info?openagent&key=whaley','_self')
+	Dim s As New notessession
+	Dim this_db As notesdatabase
+	Dim name_db As New NotesDatabase ( "" , "nab\bmsldap.nsf" )
+	Dim view As notesview
+	Dim doc As NotesDocument
+	Dim name_doc As NotesDocument
+	Dim temp As Variant
+	Redim field_name ( 10 ) As String
+	Redim person_info ( 0 ) As String
+	Dim key As String
+	Dim i As Integer
+	Dim arg As String
+	Dim pos As Integer
+	
+	Set doc = s.DocumentContext
+	
+	arg = s.DocumentContext.Query_String(0)
+	pos = Instr ( arg , "&" ) 
+	arg = Mid$ ( arg , pos + 1 )
+	pos = Instr ( arg , "=" ) 
+	arg = Mid$ ( arg , pos + 1 )
+	
+	' key = "whaley"
+	Set this_db = s.CurrentDatabase
+	Set name_db = s.GetDatabase ( "" , "nab\bmsldap.nsf" )
+	Set view = name_db.getView ( "lookups" )
+	Set name_doc = view.getDocumentByKey ( key )
+	If name_doc Is Nothing Then
+		Print "No info on person " + key
+	Else
+		field_name ( 0 ) = "FirstName"
+		field_name ( 1 ) = "MiddleInitial"
+		field_name ( 2 ) = "LastName"
+		field_name ( 3 ) = "ShortName"
+		field_name ( 4 ) = "FullName"
+		field_name ( 5 ) = "JobTitle"
+		field_name ( 6 ) = "Company"
+		field_name ( 7 ) = "StreetAddress"
+		field_name ( 8 ) = "Location"
+		field_name ( 9 ) = "OfficePhoneNumber"
+		field_name ( 10 ) = "MailAddress"
+		
+		Redim person_info ( Ubound ( field_name ) ) As String
+		For i = 0 To Ubound ( field_name )
+			temp = name_doc.GetItemValue ( field_name ( i ) )
+			person_info$ ( i ) = ( temp ( 0 ) )
+		Next
+		Print "<table border=0 cellpadding=0 cellspacing=0>"
+		For i = 0 To Ubound ( field_name )
+			Print "<tr><td align=right><font size=1 face=arial>" + field_name ( i ) + " : </td>"
+			If Instr ( person_info ( i )  , "@" ) Then
+				Print "<td align=left><font size=1 face=arial><a href=mailto:" + person_info ( i ) + ">" + person_info ( i ) + "</td></tr>"
+			Else
+				Print "<td align=left><font size=1 face=arial>" + person_info ( i ) + "</td></tr>"
+			End If
+		Next
+		Print "</table>"
+	End If
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sub NewsFlash
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim paramview As NotesView
+	Dim colldoc As NotesDocument
+	Dim fieldvalue As Variant
+	' Dim params As NotesItem
+	Dim params() As String
+	Dim counter As Integer
+	Dim NewEntry As String
+	Dim coll As notesdocumentcollection
+	Dim coll2 As notesdocumentcollection
+	Dim deldoc As notesdocument
+	Dim datetime As New notesdatetime("01/22/73")
+	Dim searchformula As String
+	Dim searchformula2 As String
+	Dim append_text As String
+	Dim i As Integer
+	Dim x As Integer
+	Dim title As Variant
+	Dim summary As Variant
+	
+	Set db = s.CurrentDatabase
+	searchformula$ = "Form = 'NewsFlashParams'"
+	Set coll = db.search(searchformula$,datetime,0)
+	For x=1 To coll.count
+		Set deldoc = coll.getnthdocument(x)
+		Call deldoc.remove(True)
+	Next
+	Set doc = New notesdocument ( db )
+	doc.form = "NewsFlashParams"
+	searchformula2$ = "Form = 'NewsFlash'"
+	Set coll2 = db.search ( searchformula2$ , datetime , 0 )
+	counter = 6
+	
+	Redim Preserve params(5) As String
+	params(0) = "[<table border=0><tr><td>" + Chr(10)
+	params(0) = params(0) + "<applet codebase='/" + db.filepath + "/OCVScroll/$FILE' code='OCVscroll.class' " + Chr(10)
+	params(0) = params(0) + "align='absbottom' width='375' height='150'>" + Chr(10)
+	params(0) = params(0) + "<param name='bgcolor' value='#F4F4FF'>"+ Chr(10) 
+	params(0) = params(0) + "<param name='centertex' value='false'>"+ Chr(10) 
+	' ##### COLORS ARE IN 256 RGB CODE #####
+	params(0) = params(0) + "<param name='hlcolor' value='128,0,0'>"+ Chr(10)
+	params(0) = params(0) + "<param name='lrmargins' value='5'>"+ Chr(10) 
+	params(0) = params(0) + "<param name='Notice' value='Smooth Scroll Up II, (c) 1997, OpenCube Technologies, Unregistered'>"+ Chr(10) 
+	params(0) = params(0) + "<param name='scrolldelay' value='25'>" + Chr(10) 
+	params(0) = params(0) + "<param name='desc0' value='NewsFlash'>"+ Chr(10) 
+	params(0) = params(0) + "<param name='size0' value='18'>"+ Chr(10)
+	' ##### COLORS ARE IN 256 RGB CODE #####
+	params(0) = params(0) + "<param name='textcolor0' value='33,66,99'>"+ Chr(10) 
+	params(0) = params(0) + "<param name='fontface0' value='Times'>"+ Chr(10) 
+	params(0) = params(0) + "<param name='style0' value='bold'>"+ Chr(10) 
+	params(0) = params(0) + "<param name='delay0' value='5000'>"+ Chr(10) 
+	params(1) = "<param name='desc1' value='Remedy Assistance Center'>"+ Chr(10)
+	params(2) = "<param name='desc2' value='One Stop for All Things Remedy'>"+ Chr(10)
+	params(3) = "<param name='desc3' value='Integrating Problem, Asset and Change Management'>"+ Chr(10) 
+	params(4) = "<param name='desc4' value=' '>"+ Chr(10) 
+	params(5) = "<param name='desc5' value=' '>"+ Chr(10) 
+	
+	For i = 1 To coll2.count
+		Msgbox("i="+Cstr(i))
+		Set colldoc = coll2.getnthdocument(i)
+		title = colldoc.GetItemValue ( "title" )
+		summary = colldoc.GetItemValue ( "summary" )  	
+		Redim Preserve params ( counter + 2 )
+		params ( counter ) = "<param name='desc" + Cstr(counter) +  "' value='" + title(0) + "'>" + Chr(10) 
+		params ( counter ) = params ( counter ) + Chr(10) + "<param name='delay" + Cstr(counter) + "' value='5000'>" + Chr(10) 
+		params ( counter ) = params ( counter ) + "<param name='desturl" + Cstr(counter) +  "' value='http://ePost.bms.com/" + db.filepath + "/NewsFlash/" + colldoc.UniversalID+ "?OpenDocument'>" + Chr(10) 
+		params ( counter ) = params ( counter ) + "<param name='size" + Cstr(counter) +  "' value='14'>" + Chr(10) 
+	     ' ##### COLORS ARE IN 256 RGB CODE #####
+		params ( counter ) = params ( counter ) + "<param name='textcolor" + Cstr(counter) +  "' value='33,66,99'>" + Chr(10) 
+		params ( counter ) = params ( counter ) + "<param name='fontface" + Cstr(counter) +  "' value='Times'>" + Chr(10) 
+		params ( counter ) = params ( counter ) + "<param name='style" + Cstr(counter) +  "' value='bold'>" + Chr(10) 
+		counter = counter + 1
+		params ( counter ) = params ( counter ) + "<param name='desc" + Cstr(counter) + "' value='" + summary(0) + "'>" + Chr(10) 
+		params ( counter ) = params ( counter ) + "<param name='size" + Cstr(counter) +  "' value='12'>" + Chr(10) 
+		counter = counter + 1
+		params ( counter ) = params ( counter ) + "<param name='desc" + Cstr(counter) +  "' value=' '>" + Chr(10) 
+		counter = counter + 1		
+	Next
+	
+	Msgbox ( Ubound ( params ) )
+	For i = 0 To Ubound ( params ) - 1
+		' Call doc.AppendItemValue( "params",  params ( i ) )
+		fieldValue = doc.GetItemValue ( "params" )
+		Call doc.ReplaceItemValue( "params",  fieldvalue ( 0 ) + params ( i ) )
+	Next
+	fieldValue = doc.GetItemValue ( "params" )
+	Call doc.ReplaceItemValue( "params",  fieldvalue ( 0 ) + "</applet></td></tr></table>]" )
+	Call doc.save ( True , True )
+End Sub

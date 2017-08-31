@@ -1,0 +1,129 @@
+Option Public
+Option Explicit
+
+Use "StringScripts"
+
+
+' ASSOCIATED FIELDS
+' ==================
+' SendTo - the e-mail addresses of administrators who will receive the auto generated confirmation e-mail 
+
+' CopyTo - the e-mail addresses of administrators who will receive a copy of the auto generated confirmation e-mail 
+
+' BlindCopyTo - the e-mail addresses of administrators who will receive a blind copy of the auto generated confirmation e-mail 
+
+' ReplyTo - the e-mail address that people should reply to from the auto generated confirmation e-mail 
+
+' Subject - text field containing the subject of the confirmation e-mail to be sent.  
+'                This can be a hiden field.  
+
+' EMailAddress - the e-mail address of the submitter.  They will receive a confirmation of their submission 
+'                          if this field exists and is not blank
+
+' SaveOptions - if form is not saved, all fields will be sent, otherwise a confirm e-mail with a link will be sent
+
+' Redirect - if used, the redirect field needs to resolve to an absolute URL containing "http://"
+'                 otherwise the "Thank You" page with field names and values will be displayed
+
+' MailReplyType - "mail_fields" or "mail_link" or "mail_fields_and_mail_link"
+
+
+
+
+Sub Initialize
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim maildoc As NotesDocument
+	Dim rtitem As NotesRichTextItem
+	Dim addString As String
+	Dim returnString As String
+	Dim server_name As String
+	Set doc = s.DocumentContext
+	Set db = doc.ParentDatabase
+	server_name = Right$ ( Cstr ( db.Server ) , Cint ( Len ( Cstr ( db.Server ) ) ) - 3 )
+	server_name = Left$ ( Cstr ( server_name ) , Cint ( Instr ( Cstr ( server_name )  , "/" ) ) - 1 )
+	Set mailDoc = db.CreateDocument ( )
+	Set mailDoc = New NotesDocument ( db ) 
+	' =====================================================================================
+	mailDoc.Form = "Memo"
+	mailDoc.SendTo = doc.SendTo
+	If ( doc.CopyTo(0) <> "" ) Then
+		mailDoc.CopyTo = doc.CopyTo
+	End If
+	If ( doc.BlindCopyTo(0) <> "" ) Then
+		mailDoc.BlindCopyTo = doc.BlindCopyTo
+	End If
+	If ( doc.Subject(0) <> "" ) Then
+		mailDoc.Subject = doc.Subject(0)
+	Else
+		mailDoc.Subject = doc.Form(0)
+	End If
+	mailDoc.Principal = doc.ReplyTo(0) + " "
+	'mailDoc.ReplyTo = doc.ReplyTo
+	'mailDoc.From = doc.ReplyTo
+	'mailDoc.SendFrom = doc.ReplyTo
+	'mailDoc.PostedDate = Now()
+	'mailDoc.ComposedDate = Now()
+	'mailDoc.DeliveredDate = Now()
+	'mailDoc.EncryptOnSend = False
+	
+	Set rtitem = mailDoc.createRichTextItem("Body")
+	addString = ""
+	'  ===== SEND E-MAIL WITH FIELD NAME AND VALUE COMBINATIONS AND =====
+	'  ===== SEND E-MAIL WITH LINK TO SAVED DOCUMENT =====
+	If ( Instr ( doc.MailReplyType(0) , "mail_fields_and_mail_link" ) ) Then
+		addString = addString + "A " + doc.Form(0) + " has been submitted." + Chr(10)
+		addString = addString + "Click on the URL below to review the document." + Chr(10)
+		addString = addString + "http://" + server_name + ".bms.com" + "/" + _
+		ReplaceSubString ( db.FilePath , "\" , "/" ) + "/0/" + doc.UniversalID + "?Open&Login" + Chr(10) + Chr(10)
+		Forall item In doc.items
+			If  ( Instr ( item.name , "$" ) Or Instr ( item.name , "disp_" ) ) Then
+			Else
+				addString = addString + item.Name + " = " + item.Text + Chr(10) + Chr(10)
+			End If
+		End Forall			
+	Elseif ( doc.SaveOptions(0) = "0" Or Instr ( doc.MailReplyType(0) , "mail_fields" ) ) Then
+	'  ===== SEND E-MAIL WITH FIELD NAME AND VALUE COMBINATIONS =====
+		Forall item In doc.items
+			If  ( Instr ( item.name , "$" ) Or Instr ( item.name , "disp_" ) ) Then
+			Else
+				addString = addString + item.Name + " = " + item.Text + Chr(10) + Chr(10)
+			End If
+		End Forall	
+	Else ' ( instr ( doc.MailReplyType(0) , "mail_link" ) ) then
+	'  ===== SEND E-MAIL WITH LINK TO SAVED DOCUMENT =====
+		addString = addString + "A " + doc.Form(0) + " has been submitted." + Chr(10)
+		addString = addString + "Click on the URL below to review the document." + Chr(10)
+		addString = addString + "http://" + server_name + ".bms.com" + "/" + _
+		ReplaceSubString ( db.FilePath , "\" , "/" ) + "/0/" + doc.UniversalID + "?Open&Login"
+	End If
+	Call rtitem.AppendText ( addString )
+	'If doc.hasEmbedded Then
+		'Forall obj In doc.EmbeddedObjects
+			'Call rtitem.EmbedObject ( EMBED_ATTACHMENT , "" , obj )
+		'End Forall
+	'End If
+	mailDoc.SaveMessageOnSend = False
+	Call mailDoc.send ( False )
+	Msgbox " ########## EMAIL SENT FROM MAILFORM IN " + Ucase ( db.FileName )  + " BY " + Ucase ( doc.Form ( 0 ) ) + " FORM ########## "
+     ' =====================================================================================
+	If doc.redirect(0) <> "" Then 
+	'  ===== ADDS REDIRECT OPTION TO FORM =====
+		Print "[" + doc.redirect(0) + "]"
+	Else 
+	' ===== PRINT RESULTS TO WEB PAGE ======
+		returnString = "<center><font size=4 face=arial><b>Thank you for submitting this form.<br>" + Chr(10)
+		returnString = returnString + "Here is what you submitted : </b></font><br><hr width=600>"  + Chr(10)
+		returnString = returnString + "<table border=1 width=450>" + Chr(10) 
+		Forall item In doc.items
+			If  ( Instr ( item.name , "$" ) Or Instr ( item.name , "disp_" ) ) Then
+			Else
+				returnString = returnString + "<tr><td bgcolor=#1860AB><font size=2 face=arial color=white><b>" + item.Name + "&nbsp;</td>"
+				returnString = returnString + "<td width=400><font size=2 face=arial>" + item.Text + "&nbsp;</td></tr>" + Chr(10) + Chr(10)
+			End If
+		End Forall
+		returnString = returnString + "</table>"  + Chr(10)
+		Print returnString
+	End If
+End Sub

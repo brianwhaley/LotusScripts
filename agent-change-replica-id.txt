@@ -1,0 +1,110 @@
+%INCLUDE "LSERR.LSS"
+Declare Function W32_NSFDbOpen Lib "nnotes.dll" Alias "NSFDbOpen" _
+(Byval dbname As String, dbHandle As Long ) As Integer
+Declare Function W32_NSFDbClose Lib "nnotes.dll" Alias "NSFDbClose" _
+(Byval dbHandle As Long ) As Integer
+Declare Function W32_NSFDBCREATE Lib "NNOTES.DLL" Alias "NSFDbCreate" _
+(Byval dbname As String, Byval dbClass As Variant, Byval forceIt As Single) As Integer
+Declare Function W32_NSFDBREPLICAINFOSET Lib "NNOTES.DLL" Alias "NSFDbReplicaInfoSet" _
+(Byval dbHandle As Long, replInfoStruct As Long) As Integer
+Declare Function W32_NSFDBREPLICAINFOGET Lib "NNOTES.DLL" Alias "NSFDbReplicaInfoGet" _
+(Byval dbHandle As Long, replInfoStruct As Long) As Integer
+
+Sub Initialize
+Dim SourceServer As String
+Dim SourceDatabase As String
+Dim DestinationServer As String
+Dim DestinationDatabase As String
+Dim db As NotesDatabase
+
+SourceServer = Inputbox$ ("Enter the server name that the database with the good replica ID resides on." _
+,"Switch Replica ID Agent -- Source Server Name" ,"PHIN02/Hub/Towers Perrin")
+SourceDatabase = Inputbox$ ("Enter the path\name of the database with the good replica ID." _
+,"Switch Replica ID Agent -- Source Database" ,"source\testsample.nsf") 
+DestinationServer = Inputbox$ ("Enter the server name of the database with the replica ID " _ 
+& "that you would like to change." ,"Switch Replica ID Agent -- Destination Server Name" _
+,"PHIN02/Hub/Towers Perrin")
+DestinationDatabase = Inputbox$ ("Enter the path\name of the database with the replica ID that you would " _
+& "like to change." ,"Switch Replica ID Agent -- Destination Database" ,"destination\testsample.nsf") 
+
+If DestinationServer = "Local" Then
+DestinationServer = ""
+End If
+If SourceServer = "Local" Then
+SourceServer = ""
+End If
+Set db = New NotesDatabase("","") 
+Call db.Open(DestinationServer,DestinationDatabase)
+If Not (db.Isopen) Then
+Msgbox "Switch Replica ID Agent could not open " & DestinationServer & "!!" & DestinationDatabase _
+, 16,"Error:"
+Exit Sub
+Else
+Call db.close
+End If 
+
+Set db = New NotesDatabase ("","") 
+Call db.Open(SourceServer,SourceDatabase)
+If Not (db.Isopen) Then
+Msgbox "Switch Replica ID Agent could not open " & sourceserver & "!!" & sourcedatabase _
+, 16,"Error:"
+Exit Sub
+End If
+Call db.close
+
+Call SwitchReplID(SourceServer,SourceDatabase,DestinationServer,DestinationDatabase) 
+
+
+
+Function SwitchReplID(S_Server As String, S_Db As String, D_Server As String, D_Db As String) As Long
+
+Dim S_DbString As String 
+Dim D_DbString As String 
+Dim dbhandle As Long
+Dim retNoteID As Long
+Dim noteClass As Long
+Dim replInfo(5) As Long
+Dim replID1 As Long 
+Dim replID2 As Long
+Select Case Ucase$(S_Server)
+Case "LOCAL"
+S_DbString = S_Db
+Case "LOKAL"
+S_DbString = S_Db
+Case ""
+S_DbString = S_Db
+Case Else
+S_DbString = S_Server + "!!" + S_Db
+End Select
+
+Select Case Ucase$(D_Server)
+Case "LOCAL"
+D_DbString = D_Db
+Case "LOKAL"
+D_DbString = D_Db
+Case ""
+D_DbString = D_Db
+Case Else
+D_DbString = D_Server + "!!" + D_Db
+End Select
+
+'====================================Get the replica info struct from Source DB===============================================
+
+REM "W32"
+rc = W32_NSFDBOPEN(S_DbString, dbhandle&)
+rc = W32_NSFDBREPLICAINFOGET(dbhandle&, replInfo(0))
+replID1 = replInfo(0) 
+replID2 = replInfo(1)
+rc = W32_NSFDBCLOSE(dbhandle&)
+
+'=====================================Replace Replica ID on Database===================================================
+rc = W32_NSFDBOPEN(D_DbString, dbhandle&)
+rc = W32_NSFDBREPLICAINFOGET(dbhandle&, replInfo(0)) 
+replInfo(0) = replID1 
+replInfo(1) = replID2 
+rc = W32_NSFDBREPLICAINFOSET(dbhandle&, replInfo(0))
+rc = W32_NSFDBCLOSE(dbhandle&)
+'______________________________________________________________________________________
+
+
+End Function 

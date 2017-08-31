@@ -1,0 +1,422 @@
+Sub qsortv(A() As Variant, i As Long, j As Long)
+                       'sort elements A(i),...,A(j) of external array A
+                       'Pivot Value
+	Dim pivot As Variant 
+                       'The index of an elements of A where key is the pivot
+	Dim pivotindex As Long
+                       'The beginning index for group of elements >= pivot     
+	Dim k As Long
+	pivotindex = findpivotv(A,i,j)
+                       'do nothing if all keys are equal
+	If pivotindex <> -1 Then
+		pivot = A(pivotindex)
+		k = partitionv(A,i,j,pivot)
+                            'Use Recursice if more than nine elements in any set
+                            'otherwise use selection sort. If you don't believe me
+                            'see Knuth's work from 1973
+		If ((k-1)-i > 9) Then
+			Call qsortv(A,i,k-1)
+		Else
+			Call selsortv(A,i,k-1)
+		End If
+		If (j-k > 9) Then
+			Call qsortv(A,k,j)
+		Else
+			Call selsortv(A,k,j)
+		End If          
+	End If          
+End Sub
+
+
+
+
+Sub qsortdocs(A() As Variant, UNID() As String, i As Long, j As Long)
+                       'sort elements UNID(i),....,UNID(j) of the external arrayUNID using the
+                       'elements A(i),...,A(j) of external array A as key values
+                       'Pivot Value
+	Dim pivot As Variant 
+                       'The index of an elements of A where key is the pivot
+	Dim pivotindex As Long
+                       'The beginning index for group of elements >= pivot     
+	Dim k As Long
+	pivotindex = findpivotv(A,i,j)
+                       'do nothing if all keys are equal
+	If pivotindex <> -1 Then
+		pivot = A(pivotindex)
+		k = partitiondocs(A,UNID,i,j,pivot)
+                            'Use Recursice if more than nine elements in any set
+                            'otherwise use selection sort. If you don't believe me
+                            'see Knuth's work from 1973
+		If ((k-1)-i > 9) Then
+			Call qsortdocs(A,UNID,i,k-1)
+		Else
+			Call selsortdocs(A,UNID,i,k-1)
+		End If
+		If (j-k > 9) Then
+			Call qsortdocs(A,UNID,k,j)
+		Else
+			Call selsortdocs(A,UNID,k,j)
+		End If          
+	End If          
+End Sub
+
+
+
+
+Sub selsortv(A() As Variant, l As Long, r As Long)
+                       'Selection Sort Routine, use on collections under 20
+                       ' Or after Pre-Quick Sorted. Passing l (left) and r (right) so we can
+                       ' assist the quick sort. This is pain if you only want
+                       ' to do a selsort. Of course there is not point to do
+                       ' that since the included qsortv routine is smart enough
+                       ' to switch gears for you.
+	Dim i,j As Long 'loop counters
+	Dim n As Long 'number of elements in array A
+	Dim lowkey As Variant 'The currently smallest key found on a pass through A(i),....,A(n)     
+	Dim lowindex As Long 'The position of lowkey        
+	For i = l To r-1 
+                            'Select the lowest among A(i),....,A(n) and swap it with A(i)          
+		lowindex = i          
+		lowkey = A(i)
+		For j = i + 1 To r
+                                 'Compare each key with current lowkey               
+			If A(j) < lowkey Then
+				lowkey = A(j)
+				lowindex = j
+				Call swapv(A,i,lowindex)                    
+			End If                          
+		Next          
+	Next     
+End Sub
+
+
+
+
+Sub selsortdocs(A() As Variant, UNID() As String, l As Long, r As Long )
+                       'Selection Sort Routine, use on collections under 20
+                       ' Or after Pre-Quick Sorted. Passing l (left) and r (right) so we can
+                       ' assist the quick sort. This is pain if you only want
+                       ' to do a selsort. Of course there is not point to do
+                       ' that since the included qsortv routine is smart enough
+                       ' to switch gears for you.          
+	For i = l To r-1 
+                            'Select the lowest among A(i),....,A(n) and swap it with A(i)          
+		lowindex = i          
+		lowkey = A(i)
+		For j = i + 1 To r
+                                 'Compare each key with current lowkey               
+			If A(j) < lowkey Then
+				lowkey = A(j)
+				lowindex = j
+				Call swapdocs(A,UNID,i,lowindex)                       
+			End If                          
+		Next          
+	Next     
+End Sub
+
+
+
+
+Sub swapv(array() As Variant, Byval x As Long ,Byval y As Long)
+	                      'Position swapper
+	Dim temp As Variant
+	temp = array(x)
+	array(x) = array(y)
+	array(y) = temp
+End Sub
+
+
+
+
+Sub swapdocs(array() As Variant, UNID() As String, Byval x As Long,Byval y As Long)
+	Dim temp As Variant
+	                   'Swap key field
+	temp = array(x)
+	array(x) = array(y)
+	array(y) = temp
+	                       'Swap UNIX field
+	temp = UNID(x)
+	UNID(x) = UNID(y)
+	UNID(y) = temp
+End Sub
+
+
+
+
+Function partitionv(A() As Variant, Byval l As Long, Byval r As Long, pivot As Variant) As Long          
+	                       'Partition A(l),...,A(r) so keys < pivot are at the left and keys >= pivot are on the right.
+	                       'Returns the beginning of the group on the right. Notice l,r are byVal because we have to move them around
+	Do
+		                            'Swap a top of loop for convience of coding
+		                            'first swap is immaterial as does not effect results
+		Call swapv(A,l,r)
+		                            'Scan phase
+		While A(l) < pivot
+			l = l + 1                              
+		Wend
+		While A(r) >= pivot 
+			r = r - 1
+		Wend                    
+	Loop Until l > r
+	partitionv = l	
+End Function
+
+
+
+
+Function partitiondocs(A() As Variant, UNID() As String, Byval l As Long, Byval r As Long, pivot As Variant) As Long 
+                       'Partition A(l),...,A(r) so keys < pivot are at the left and keys >= pivot are on the right.
+                       'Returns the beginning of the group on the right. Move UNID is a manner that tracks A.
+                       'Notice l,r are byVal because we have to move them around
+	Do
+                            'Swap a top of loop for convience of coding
+                            'first swap is immaterial as does not effect results
+		Call swapdocs(A,UNID,l,r)
+                            'Scan phase
+		While A(l) < pivot
+			l = l + 1                              
+		Wend
+		While A(r) >= pivot 
+			r = r - 1
+		Wend                    
+	Loop Until l > r
+	partitiondocs = l
+End Function
+
+
+
+
+Function findpivotv(A() As Variant, i As Long, j As Long) As Long
+                       'Returns -1 if A(i),...,A(j) have identical keys, otherwise
+                       'Returns the index of the larger of the leftmost two different keys
+	Dim firstkey As Variant ' Value of first key found, ie, A(i)
+	Dim k As Long
+	firstkey = A(i)
+	For k = i + 1 To j
+                            'scan for different key
+		If A(k) > firstkey Then
+                                 'select larger key
+			findpivotv = k
+			Exit Function
+		Elseif A(k) < firstkey Then
+			findpivotv = i
+			Exit Function
+		End If          
+	Next
+                       'Different keys not found
+	findpivotv = -1
+End Function
+
+
+
+
+Sub qsortS(A() As String, i As Long, j As Long)
+                       'sort elements A(i),...,A(j) of external array A of Strings
+                       'Pivot Value
+	Dim pivot As String
+                       'The index of an elements of A where key is the pivot
+	Dim pivotindex As Long
+                       'The beginning index for group of elements >= pivot     
+	Dim k As Long
+	pivotindex = findpivotS(A,i,j)
+                       'do nothing if all keys are equal
+	If pivotindex <> -1 Then
+		pivot = A(pivotindex)
+		k = partitionS(A,i,j,pivot)
+                            'Use Recursice if more than nine elements in any set
+                            'otherwise use selection sort. If you don't believe me
+                            'see Knuth's work from 1973
+		If ((k-1)-i > 9) Then
+			Call qsortS(A,i,k-1)
+		Else
+			Call selsortS(A,i,k-1)
+		End If
+		If (j-k > 9) Then
+			Call qsortS(A,k,j)
+		Else
+			Call selsortS(A,k,j)
+		End If          
+	End If          
+End Sub
+
+
+
+
+Function findpivotS(A() As String, i As Long, j As Long) As Long
+                       'Returns -1 if A(i),...,A(j) have identical keys, otherwise
+                       'Returns the index of the larger of the leftmost two different keys
+	Dim firstkey As String ' Value of first key found, ie, A(i)
+	Dim k As Long
+	firstkey = A(i)
+	For k = i + 1 To j
+                            'scan for different key
+		If A(k) > firstkey Then
+                                 'select larger key
+			findpivotS = k
+			Exit Function
+		Elseif A(k) < firstkey Then
+			findpivotS = i
+			Exit Function
+		End If          
+	Next
+                       'Different keys not found
+	findpivotS = -1     
+End Function
+
+
+
+
+Function partitionS(A() As String, Byval l As Long, Byval r As Long, pivot As Variant) As Long          
+'Partition A(l),...,A(r) so keys < pivot are at the left and keys >= pivot are on the right.
+'Returns the beginning of the group on the right. Notice l,r are byVal because we have to move them around
+	Do
+'Swap a top of loop for convience of coding
+'first swap is immaterial as does not effect results
+		Call swapS(A,l,r)
+'Scan phase
+		While A(l) < pivot
+			l = l + 1                              
+		Wend
+		While A(r) >= pivot 
+			r = r - 1
+		Wend                    
+	Loop Until l > r
+	partitionS = l	
+End Function
+
+
+
+
+Sub swapS(array() As String, Byval x As Long ,Byval y As Long)
+	'Position swapper
+	Dim temp As String
+	temp = array(x)
+	array(x) = array(y)
+	array(y) = temp     
+End Sub
+
+
+
+
+Sub selsortS ( A() As String, l As Long, r As Long)	
+'Selection Sort Routine, use on collections under 20
+' Or after Pre-Quick Sorted. Passing l (left) and r (right) so we can
+' assist the quick sort. This is pain if you only want
+' to do a selsort. Of course there is no point to do
+' that since the included qsortS routine is smart enough
+' to switch gears for you.
+	Dim i,j As Long 'loop counters
+	Dim n As Long 'number of elements in array A
+	Dim lowkey As String 'The currently smallest key found on a pass through A(i),....,A(n)     
+	Dim lowindex As Long 'The position of lowkey        
+	
+	For i = l To r-1 
+	                           'Select the lowest among A(i),....,A(n) and swap it with A(i)          
+		lowindex = i          
+		lowkey = A(i)
+		For j = i + 1 To r
+		                                 'Compare each key with current lowkey               
+			If A(j) < lowkey Then
+				lowkey = A(j)
+				lowindex = j
+				Call swapS(A,i,lowindex)                    
+			End If                          
+		Next          
+	Next          
+End Sub
+
+
+
+
+
+
+
+Sub BubbleSort
+          '--Do a magical bubble sort to sort the forms according to their titles
+	Dim top, bot, cur, cur2 As Integer
+	Dim formArray() As Integer
+	Dim tmp_element As Variant
+	top = Ubound(formArray)
+	bot = Lbound(formArray)
+	For cur = bot To top
+		cur2 = cur
+		Do While cur2 > bot  '--bubble up
+			If(formArray(cur2) > formArray(cur2-1)) Then
+				Exit Do
+			Else  '--swap
+				tmp_element = formArray(cur2)
+				formArray(cur2) = formArray(cur2-1)
+				formArray(cur2-1) = tmp_element
+			End If
+			cur2 = cur2-1
+		Loop
+	Next
+     '--This ends the magical bubble sort. Do you feel freshly percolated?
+End Sub
+
+
+
+
+Sub QuickSort (l As Integer,r As Integer, arrayelts As Variant)  
+' Employs a "divide-and-conquer" approach to get the data sorted. Works on subsets of data to sort, for each subset two pointers, i and j, 
+' are kept. In addition to this a sort-key is nominated (here, its the value at the left of the sublist being sorted). i and j are brought together
+' (i.e., i increases, j decreases) swapping items into order as they approach. When i and j sense that the nominated value belongs where
+' they're sitting they move it there and then sort the data either side of the nominated value's new point.
+' PROS: Lightning quick, the Quicksort algorithm attempts to only compare and swap each element with another once. 
+' CONS: Although not very complicated, some structures are very difficult to code into a quicksort.
+' Pass the lower bound of the array to l, the upper bound of the array to r and the array to arrayelts.
+' This is working on pass by reference once returned to the main program the array passed will be sorted. At that point you can save
+' it to a document field.     
+	Dim m As Variant
+	Dim i As Integer
+	Dim t As Variant
+	Dim j As Integer
+	If r > l Then              'If there's nothing to sort, jump out
+		m = arrayelts(l)      'Initialize boundaries, nominate a value to sort
+		j = r
+		i = l    
+		While (i < j)         'Repeat until i and j "meet in the middle"
+			While (arrayelts(i) <= m And i < r)  'Push in the boundaries while data is sorted
+				i = i + 1
+			Wend
+			While (arrayelts(j) > m)
+				j = j - 1
+			Wend
+			If i < j  Then   'If there is data between i and j something is out of order - swap it
+				t = arrayelts(i)
+				arrayelts(i) = arrayelts(j)
+				arrayelts(j) = t
+			End If
+		Wend
+		t = arrayelts(l)       'Swap the nominated and bottom values - why we came here
+		arrayelts(l) = arrayelts(j)
+		arrayelts(j) = t
+		Call quicksort (l, j - 1, arrayelts)  'Recurse and sort data either side of upper bound
+		Call quicksort ((j + 1), r, arrayelts)
+	End If
+End Sub
+
+
+
+
+Function SortArray ( inarray As Variant ) As Variant
+	Dim i , j , max As Integer
+	Dim array As Variant
+	Dim v As Variant
+	array = inarray
+	max = Ubound ( array )
+	For i = 0 To max - 1
+		For j = i + 1 To max
+			If array ( i ) > array ( j ) Then
+				v = array ( i )
+				array ( i ) = array ( j )
+				array ( j ) = v
+			End If
+		Next
+	Next
+	SortArray = array
+End Function
+
+
+
+

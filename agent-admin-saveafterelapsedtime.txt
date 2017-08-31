@@ -1,0 +1,39 @@
+Option Public
+
+
+
+
+
+Dim elapsedTime As Integer
+Dim elapsedTimer As notestimer
+%INCLUDE "lsconst.lss"
+
+
+
+
+
+Sub Postopen(Source As Notesuidocument)
+	Set elapsedtimer = New NotesTimer ( 60 , "Elapsed time since opening document" )
+	elapsedtime = 0
+	On Event alarm From elapsedtimer Call elapsedTimerHandler
+End Sub
+
+
+
+
+Sub elapsedtimerhandler(source As notestimer)
+	Dim workspace As New NotesUIWorkspace
+	Dim uidoc As NotesUIDocument
+	Set uidoc = workspace.CurrentDocument
+	elapsedtime = elapsedtime + 60
+	If elapsedtime >299 Then
+		If uidoc.EditMode = True Then
+			Call uidoc.Save
+			elapsedtime = 0
+		End If
+	End If
+End Sub
+
+
+
+

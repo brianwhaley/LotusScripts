@@ -1,0 +1,325 @@
+Option Public
+' Option Declare
+
+
+
+Sub ExportToWord ( coll As NotesDocumentCollection )
+	Dim doc As NotesDocument
+	Dim newstuff As String
+	Dim i , rows As Integer
+	Dim wordapp , wordTempDoc As Variant
+	Set wordApp = createobject("Word.Application.8")  
+	Set wordTempDoc = wordApp.documents
+	wordTempDoc.add
+	For i = 1 To coll.count
+		Set doc = coll.getnthdocument(i)
+		Call wordApp.ActiveDocument.Tables.Add ( wordApp.Selection.Range , 1  , 2 )
+		rows = 1
+		Forall item In doc.Items
+			If item.text <> "" Then
+				Call wordApp.Selection.TypeText ( item.Name )
+				Call wordApp.Selection.MoveRight ( 1 , 1 )
+				Call wordApp.Selection.TypeText ( item.Text )
+				Call wordApp.Selection.MoveDown ( 5 , 1 )
+				Call wordApp.Selection.InsertRows ( 1 )
+				rows = rows + 1
+			End If
+		End Forall
+		Call wordApp.Selection.MoveDown ( 5 , 1 )
+		Call wordApp.Selection.InsertBreak ( 7 )
+          ' Print PercentComplete ( 100 , Cdbl ( i ) , Cdbl ( coll.count ) )
+	Next
+	wordApp.visible = True
+End Sub
+
+
+Sub ExportToExcel ( coll As NotesDocumentCollection )
+	Dim doc As NotesDocument
+	Dim i , rows As Integer
+	Dim xlApp , xlSheet As Variant
+	Set xlApp = CreateObject ( "Excel.application" )
+	xlApp.workbooks.Add
+	For i = 1 To coll.count
+		Set doc = coll.getnthdocument(i)
+		xlApp.Workbooks(1).Worksheets.Add
+		rows = 1
+		Forall item In doc.Items
+			If item.Text <> "" Then
+				xlApp.Cells(rows,1).Value = item.Name
+				xlApp.Cells(rows,2).Value = item.Text
+				rows = rows + 1
+			End If
+		End Forall
+		xlApp.Columns("A:A").Select
+		xlApp.Selection.Font.Bold = True
+		xlApp.Selection.Font.Size = 10
+		xlApp.Columns("B:B").Select
+		xlApp.Selection.ColumnWidth = 45
+		With xlApp.Selection
+			.HorizontalAlignment = -4131
+			.WrapText = True
+		End With
+		xlApp.Selection.Font.Size = 8
+		xlApp.Columns("A:B").Select
+		xlApp.Selection.Columns.AutoFit
+          ' Print PercentComplete ( 100 , Cdbl ( i ) , Cdbl ( coll.count ) )
+	Next
+	xlApp.visible = True
+End Sub
+
+
+
+
+
+
+Sub ExportToCSV
+	Dim s As New NotesSession
+	Dim ws As New NotesUIWorkspace
+	Dim db As NotesDatabase
+	Dim view As NotesView
+	Dim doc As NotesDocument
+	Dim stringie As String
+	Dim fileName As String
+	Dim i As Integer
+	Dim fileNum As Integer
+	Set db = s.CurrentDatabase
+	Set view = db.GetView("RTSView")
+	fileName = "c:\windows\profiles\bwhaley\desktop\export.csv"
+	fileNum = Freefile()
+	stringie = ""
+	Open fileName For Output As fileNum
+	Set doc = view.GetFirstDocument
+	While Not ( doc Is Nothing )   
+		For i = 1 To Ubound ( doc.items )
+			stringie = stringie + "," + doc.GetFirstItem ( Cstr ( doc.items(i).name ) ) .text 
+		Next
+		Print # fileNum , Cstr ( i ) + stringie
+		Set doc = view.getNextDocument(doc)
+		Messagebox ( i )
+	Wend
+	Close fileNum 
+End Sub
+
+
+
+
+
+Sub ExportToTXT
+	Dim s As New NotesSession
+	Dim ws As New NotesUIWorkspace
+	Dim db As NotesDatabase
+	Dim coll As NotesDocumentCollection
+	Dim view As NotesView
+	Dim doc As NotesDocument
+	Dim i As Integer
+	Dim fileNum As Integer
+	Dim separator As String
+	Dim fileName As String
+	Set db = s.GetDatabase( "", "JokeMail.nsf" )
+     ' Set view = db.GetView("($All)")
+	fileName = "c:\windows\profiles\bwhaley\desktop\Jokes.txt"
+	separator = "----- End of Joke -----"
+	fileNum = Freefile()
+	Open fileName For Output As fileNum
+	Set coll = db.Search( "Form = ""Memo""" , Nothing , 0 )
+	For i = 1 To coll.count
+		Set doc = coll.getNthDocument ( i ) 
+		Print # fileNum , "----- Joke Number " + Cstr ( i ) + " -----"
+		Print # fileNum , doc.GetFirstItem("Body").text
+		Print # fileNum , ""
+		Print # fileNum , separator
+		Print # fileNum , ""
+		' Print PercentComplete ( 100 , Cdbl ( i ) , Cdbl ( coll.Count ) )
+	Next
+	Close fileNum 
+End Sub
+
+
+
+
+
+Sub ExportToXML
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim view As NotesView
+	Dim doc As NotesDocument
+	Dim mailDoc As NotesDocument
+	Dim rtitem As NotesRichTextItem
+	Dim returnString As String
+	Dim fileName As String
+	Dim i As Integer
+	Dim fileNum As Integer
+	
+	Set db = s.CurrentDatabase
+	Set view = db.GetView("all")
+	Set doc = view.GetFirstDocument
+	fileName = "c:\documents and settings\whaleb\desktop\db.xml"
+	fileNum = Freefile()
+	
+	returnString = "<?xml version='1.0'?>" & Chr(10)
+	Open fileName For Output As fileNum
+	While Not ( doc Is Nothing )
+		returnString = returnString + "<" + doc.Form(0) + " value=" + doc.UniversalID + ">"
+		For i = 1 To Ubound ( doc.items )
+			returnString = returnString + "    <" + Cstr ( doc.items(i).name ) + ">" + _
+			doc.GetFirstItem ( Cstr ( doc.items(i).name ) ) .text + ">" + _
+			"</" + Cstr ( doc.items(i).name ) + ">" + Chr(10)
+		Next
+		returnString = returnString + "</" + doc.Form(0) + ">" + Chr(10)
+		Print # fileNum , returnString
+		Set doc = view.getNextDocument ( doc )
+	Wend
+	Close fileNum 
+End Sub
+
+
+
+
+Sub ExportWebViewToCSV
+	
+	' Use excel. 
+	' Go File > Open and type in the url for the view you want 
+	' and it will be brought into excel, or access.	
+	
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim view As NotesView
+	Dim doc As NotesDocument
+	Dim mailDoc As NotesDocument
+	Dim rtitem As NotesRichTextItem
+	Dim returnString As String
+	Dim i As Integer
+	
+	Set db = s.CurrentDatabase
+	Set view = db.GetView("MenuItems")
+	Set doc = view.GetFirstDocument
+	
+	Print "content-type:text/csv" + Chr(10) + Chr(10)
+	
+	While Not ( doc Is Nothing )
+		returnString = ""
+		For i = 1 To Ubound ( doc.items )
+			If returnString = "" Then
+				returnString = returnString + doc.GetFirstItem ( Cstr ( doc.items(i).name ) ) .text 
+			Else
+				returnString = returnString + "," + doc.GetFirstItem ( Cstr ( doc.items(i).name ) ) .text 
+			End If
+		Next
+		Print returnString
+		Set doc = view.getNextDocument ( doc )
+	Wend
+	
+End Sub
+
+
+
+
+Sub ODBC_R5
+	Dim session As New NotesSession
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim view As NotesView
+	Dim display As NotesItem
+     'Dim con As New ODBCConnection 
+     'Dim qry As New ODBCQuery 
+     'Dim result As New ODBCResultSet 
+	Dim dvdTitle As String
+	Dim studio As String
+	Dim avail As String
+	Dim query_input As String
+	Dim defaultQuery As String
+	
+	Set db = session.CurrentDatabase
+	Set doc = New notesDocument(db)
+	Set view = db.GetView("ODBCView")
+	Set display = New notesItem(doc, "display", "")
+	
+     '-- set up connection to external data source, Access database
+	Set qry.Connection = con
+	Set result.Query = qry
+	con.ConnectTo("ex_database")
+	
+     '-- get SQL from user
+	defaultQuery = "SELECT * FROM [table]"
+	query_input = Inputbox("Defaults to: " & defaultQuery, "SQL statement", qry.SQL)
+	If query_input = "" Then query_input = defaultQuery
+	
+     '-- run SQL query
+	qry.SQL = query_input
+	result.Execute
+	
+     '-- generate output from query
+	Do 
+		result.NextRow
+		dvdTitle = result.GetValue("DVDTITLE", dvdTitle)
+		studio = result.GetValue("STUDIO",studio)
+		avail = result.GetValue("AVAIL",avail)
+		display.AppendToTextList(dvdTitle & " " & studio & " " & avail)
+		msg = dvdTitle
+	Loop Until result.IsEndOfData
+	
+	Call doc.replaceItemValue("Form", "ODBCform")
+	Call doc.Save(True, False)
+     '-- close database, and disconnect from ODBC
+	result.Close(DB_CLOSE)
+	con.Disconnect
+End Sub
+
+
+
+
+Sub NotesPump
+'The snippet of code below is very useful for writing ODBC scripts. It loops through all
+'fields in the table being accessed by your SQL statement, getting the name of each
+'field; if it finds a field named the same on the Notes document being accessed by the
+'script, it pushes the data to the relational database after determining the type of data to push.
+'What does this mean? It means that you can write generic ODBC scripts, that don't
+'need to be changed if you add fields to your relational tables and/or Notes forms, as
+'long as the names of the fields are the same! It's cool because it ignores any fields on
+'the Notes form not specifically named the same as fields on the Access database.
+'Also, when the script looks in the Access database for the corresponding record for
+'the Notes document, if it finds a match, it updates the match, but if not, it creates it no
+'matter what. This guarantees a measure of redundancy in the system, which is
+'sometimes a great boon.
+'You could place script using this technique in the QuerySave event of a form for the
+'Notes client, or in an agent run by the WebQuerySave event of a form, or in an agent
+'that loops through documents in a view, etc. .... it really doesn't matter.
+	Dim tempvalue As Variant
+     'Dim con As New ODBCConnection
+     'Dim res As New ODBCResultSet
+     'Dim qry As New ODBCQuery
+	Set qry.Connection = con
+	Set res.Query = qry
+	Set uidoc = ws.CurrentDocument
+	Set doc = uidoc.Document
+	
+	If (con.ConnectTo("<YOUR DATA SOURCE>")) Then
+		If (doc.IsNewNote) Then
+			qry.SQL = "<SOME BOGUS SQL DESIGNED TO RETURN NO DATA>" 
+		Else
+			qry.SQL = "SELECT * from <YOUR TABLE> WHERE ..."
+		End If
+		Call res.Execute
+		If (doc.IsNewNote) Then
+			Call res.AddRow
+		Elseif Not(res.IsResultSetAvailable) Then
+			Call res.AddRow
+		Else
+			Call res.FirstRow
+		End If
+		For n = 1 To res.NumColumns
+			tempname$ = res.FieldName(n)
+			tempvalue = doc.GetItemValue(tempname$)
+			If (Datatype(tempvalue(0)) <> 5) Then
+				If (tempvalue(0) <> "") Then
+					Call res.SetValue(tempname$, tempvalue(0)) 
+				End If 
+			Else
+				Call res.SetValue(tempname$, Trim(Str(tempvalue(0)))) 
+			End If 
+		Next
+		Call res.UpdateRow
+		Call res.Close(DB_CLOSE)
+		Call con.Disconnect 
+	End If
+End Sub

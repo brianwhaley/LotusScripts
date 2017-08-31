@@ -1,0 +1,146 @@
+Option Public
+Option Explicit
+Uselsx "LSXLDAP"
+
+	' ###############################################################
+	' USE THIS CODE IN AN AGENT TO RETURN ALL MEMBERS OF AN LDAP GROUP
+	' Redim thisArray(0) As Variant
+	' Call getMembers ( "mg-dts-ao-support-all", thisArray) 
+	' Msgbox ( Cstr ( Ubound ( thisArray ) ) + Chr(10) + thisArray ( 1 ) + Chr(10) + thisArray ( 105 ) )
+	' USE THIS CODE IN AN AGENT TO RETURN ALL EMAIL ADDRESSES FROM AN ARRAY OF UIDS
+	' Call getEmailAddresses ( thisArray) 
+	' Msgbox ( Cstr ( Ubound ( thisArray ) ) + Chr(10) + thisArray ( 1 ) + Chr(10) + thisArray ( 105 ) )
+	' ###############################################################	
+
+	' LSession.Host = "nsusdir02.net.bms.com"
+	' LSession.Host = "smusath01.net.bms.com"
+	' LSession.Host = "nsusath01.net.bms.com"
+	' LSession.Host = "nsusath02.net.bms.com"
+	' LSession.Host = "dir-server.bms.com"
+
+
+Function getMembers ( searchStr As String, LArray As Variant )
+	Dim LSession As LDAPSession
+	Dim LSearch As LDAPSearch
+	Dim LResultSet As LDAPResultSet
+	Dim LEntry As LDAPEntry
+	Dim LVals As Variant
+	Dim Lcn As String
+	Dim returnString As String
+	Dim retStatus As Integer
+	Dim i As Integer
+	
+	Set LSession = New LDAPSession
+	Set LSearch = New LDAPSearch
+	Set LResultSet = New LDAPResultSet
+	LSession.Host = "nsusath01.net.bms.com"
+	retStatus% = LSession.Connect
+	Set LSearch.Session = LSession
+	Set LSearch.ResultSet = LResultSet
+	' LSearch.Base = "ou=Groups,l=Americas,o=bms.com"	
+	LSearch.Base = "o=bms.com"
+	LSearch.Filter = "cn=" + searchStr
+	retstatus% = LSearch.Execute
+	If LResultSet.Count <> 1 Then
+	Else
+		Set LEntry = LResultSet.GetFirstEntry()
+		While Not ( LEntry Is Nothing )
+			LVals = LEntry.GetValue ( "uniquemember" )
+			For i = Lbound ( LVals ) To Ubound ( LVals ) 
+				If LVals ( i ) = "" Then
+				Else
+					Lcn = Left ( Cstr ( LVals ( i ) ) , Instr ( LVals ( i ) , "," ) - 1 )
+					Lcn = ( Right ( Lcn , Len ( Lcn ) - Instr ( Lcn , "=" ) ) )
+					If Instr ( Lcase ( LVals ( i ) ) , "cn=" ) Then
+						Call getMembers ( Lcn , LArray )
+					Elseif Instr ( Lcase ( LVals ( i ) ) , "uid=" ) Then
+					' Elseif Instr ( Lcase ( LVals ( i ) ) , "bmsid=" ) Then
+						Redim Preserve LArray ( Ubound ( LArray ) + 1 ) As Variant
+						LArray ( Ubound ( LArray ) ) = Lcn
+					End If
+				End If
+			Next
+			Set LEntry = LResultSet.GetNextEntry ( LEntry )
+		Wend
+	End If
+	retStatus% = LSession.Disconnect
+End Function
+
+
+
+Sub getGroups	( searchStr As String , fieldName As String )
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim LSession As LDAPSession
+	Dim LSearch As LDAPSearch
+	Dim LResultSet As LDAPResultSet
+	Dim LEntry As LDAPEntry
+	Dim returnString As String
+	Dim retStatus As Integer
+	Dim blankArray As Integer
+	
+	Set db = s.CurrentDatabase
+	Set doc = s.DocumentContext
+	Set LSession = New LDAPSession
+	Set LSearch = New LDAPSearch
+	Set LResultSet = New LDAPResultSet
+	LSession.Host = "nsusath01.net.bms.com"
+	retStatus% = LSession.Connect
+	Set LSearch.Session = LSession
+	Set LSearch.ResultSet = LResultSet
+	blankArray = True
+	Redim LArray(0)
+	LSearch.Base = "o=bms.com"
+	LSearch.Filter = searchStr
+	retstatus% = LSearch.Execute
+	If LResultSet.Count = 0 Then
+	Else
+		Set LEntry = LResultSet.GetFirstEntry()
+		While Not (LEntry Is Nothing)
+			returnString = returnString + doc.vals(0) + LEntry.getValueString("cn") + Chr(10)
+'		attrib_Name$ = LEntry.getFirstAttr()
+'		While Not (attrib_Name$ = "" )
+'			attrib_Value = LEntry.getValue( attrib_Name$ )			
+'			attrib_Name$ = LEntry.getNextAttr()
+'		Wend
+			Set LEntry = LResultSet.GetNextEntry ( LEntry )
+		Wend
+	End If
+	Call doc.ReplaceItemValue ( fieldName , returnString )
+	retStatus% = LSession.Disconnect
+End Sub
+
+
+
+Function getEmailAddresses  ( LArray As Variant )
+	Dim LSession As LDAPSession
+	Dim LSearch As LDAPSearch
+	Dim LResultSet As LDAPResultSet
+	Dim LEntry As LDAPEntry
+	Dim LVals As Variant
+	Dim Lcn As String
+	Dim returnString As String
+	Dim retStatus As Integer
+	Dim i As Integer
+	
+	For i = Lbound ( LArray ) To Ubound ( LArray )
+		Set LSession = New LDAPSession
+		Set LSearch = New LDAPSearch
+		Set LResultSet = New LDAPResultSet
+		LSession.Host = "nsusath01.net.bms.com"
+		retStatus% = LSession.Connect
+		Set LSearch.Session = LSession
+		Set LSearch.ResultSet = LResultSet
+		LSearch.Base = "o=bms.com"
+		LSearch.Filter = "uid=" + LArray ( i )
+		retstatus% = LSearch.Execute
+		If LResultSet.Count <> 1 Then
+		Else
+			Set LEntry = LResultSet.GetFirstEntry()
+			LVals = LEntry.GetValue ( "mail" )
+			Larray ( i ) = LVals (0)
+		End If
+		retStatus% = LSession.Disconnect
+	Next
+End Function

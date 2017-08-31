@@ -1,0 +1,32 @@
+Option Public
+Option Explicit
+
+
+
+
+
+
+Sub Initialize
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim maildoc As NotesDocument
+	Dim richStyle As NotesRichTextStyle
+	Set db = s.CurrentDatabase
+	s.ConvertMime = False
+	Set mailDoc = db.CreateDocument ( )
+	mailDoc.Form = "Memo"
+	mailDoc.SendTo = "brian.whaley@bms.com@extern" 
+	mailDoc.Subject = "Test"	
+	Set richStyle = s.CreateRichTextStyle
+	Dim richText As New NotesRichTextItem ( maildoc , "Body" )
+	richStyle.PassThruHTML = True
+	Call richText.AppendStyle ( richStyle )
+	Call richText.AppendText ( "Content-Type: text/html; charset=us-ascii" + Chr(10) )
+	Call richText.AppendText ( "Content-Transfer-Encoding: 7bit" + Chr(10) + Chr(10) )	
+	Call richText.AppendText ( "<!doctype html public ""-//w3c//dtd html 4.0 transitional//en"">" + Chr(10) )
+	Call richText.AppendText ( "<html>" + Chr(10) )
+	Call richText.AppendText ( "<B>Hello</B>" )	
+	mailDoc.SaveMessageOnSend = False
+	Call mailDoc.send ( False )
+	Print "[http://cs.bms.com]"
+End Sub

@@ -1,0 +1,45 @@
+Option Public
+Option Explicit
+Use "StringScripts"
+
+
+
+
+
+Sub Initialize
+	Dim s As NotesSession
+	Dim db As NotesDatabase
+	Dim rolloutColl As NotesDocumentCollection
+	Dim testColl As NotesDocumentCollection
+	Dim rolloutDoc As NotesDocument
+	Dim testDoc As NotesDocument
+	Dim bday As New NotesDateTime ( "01/22/1973" )
+	Dim searchFormula As String
+	Dim i As Integer
+	Dim k As Integer
+	
+	Set s = New NotesSession
+	Set db = s.CurrentDatabase	
+	searchFormula$ = " Form = 'ac_Rollout' "
+	Set rolloutColl = db.Search ( searchFormula$ , bday, 0 )
+	
+	Msgbox "##### App Central - Fix Children #####"
+	
+	For i = 1 To rolloutColl.count
+		If rolloutColl.count > 0 Then
+			Set rolloutDoc = rolloutColl.getNthDocument ( i )
+			searchFormula$ = " Form = 'ac_Test' & @Text ( $REF ) = '" + Cstr ( rolloutDoc.UniversalId ) + "' "
+			Set testColl = db.Search ( searchFormula$ , bday, 0 )
+			If testColl.count > 0 Then
+				For k = 1 To testColl.count
+					Set testDoc = testColl.getNthDocument ( k )
+					testDoc.test_deploy = rolloutDoc.test_deploy
+					Call testDoc.Save ( True, True )
+					Print "Rollout # " + Cstr(i) + " of " + Cstr(rolloutColl.count) + " -> " + _
+					"Test Doc # " + Cstr(k) + " of " + Cstr(testColl.count)
+				Next
+			Else
+			End If
+		End If
+	Next
+End Sub

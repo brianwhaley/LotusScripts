@@ -1,0 +1,53 @@
+Option Public
+Option Declare
+
+
+
+
+
+Sub Initialize
+	Dim s As New notessession
+	Dim coll As NotesDocumentCollection
+	Dim db , docDB As notesdatabase
+	Dim aclist As NotesACL
+	Dim aclentry As NotesACLEntry
+	Dim aclentries() As String
+	Dim x As Integer
+	Dim dbPath As String
+	Dim view As notesview
+	Dim doc As notesdocument
+	Dim keyarray() As String
+	Dim searchDate As New NotesDateTime ( "1/22/73" )
+	
+	Set db = s.currentdatabase
+	Set view = db.getview("dbs")
+	Set doc = view.GetFirstdocument()    
+	
+	If doc Is Nothing Then Exit Sub
+	Do While Not ( doc Is Nothing )    
+		dbPath = ""
+		If doc.dbPath(0) <> "" Then dbPath = doc.dbPath(0) + "/"
+		Set docDB = s.getDatabase ( doc.dbServer(0) , dbPath + doc.dbFileName(0) )
+		If docDB Is Nothing Then
+		Elseif doc.dbFileName(0) = "" Then
+		Else
+			Set aclist = docDB.acl
+			If aclist Is Nothing Then 
+			Else
+				doc.dbRoles = aclist.roles
+			End If
+			Set aclentry = aclist.getfirstentry()
+			x = -1
+			Do While Not ( aclentry Is Nothing ) 
+				x = x +1
+				Redim Preserve aclentries (x) As String
+				aclentries(x) = aclentry.name
+				Set aclentry = aclist.getnextentry(aclentry)
+			Loop
+			doc.dbAccessGroups = aclentries
+			Call doc.save ( True , True )
+		End If
+		Set doc = view.GetNextdocument ( doc )     
+	Loop
+	
+End Sub

@@ -1,0 +1,307 @@
+Sub ImportExcel
+	
+' The first cell of the first row is the form name
+' The second row must be all field names
+' The third and all consecutive rows are new records
+' A blank column will limit the number of fields imported
+' A blank row will limit the number of new entries
+	
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim Doc As NotesDocument
+	Dim TempDate As New NotesDateTime ("") 
+	Dim ExcelPath As String
+	Dim ExcelFiles As String
+	Dim ExcelFile
+	Dim SheetName As String
+	Dim BoxType As Long	
+	Dim DocCounter As Integer 
+	Dim answer As Integer
+	Dim cellCol As Integer
+	Dim cellRow As Integer
+	Dim colBlank As Integer
+	Dim rowBlank As Integer
+	Dim fieldNum As Integer
+	Redim cellNames(0) As String
+	Redim cellValues(0) As String
+	Dim xls
+	
+	Set db = s.CurrentDatabase
+	
+ExcelPath: 
+	ExcelPath = Inputbox$ ("Enter Excel File Directory","Excel Import","C:\Documents and Settings\whaleb\desktop")
+	' ExcelPath = Inputbox$ ("Enter Excel File Directory","Excel Import","C:\Temp")
+	If ExcelPath = "" Then
+		BoxType& = 1 'MB_OKCANCEL
+		answer = Messagebox ("Please enter the Excel File Directory Path",BoxType&,"Enter Excel File Directory")
+		If answer = 2 Then
+			Goto finish
+		Else
+			Goto ExcelPath 
+		End If
+	End If
+	If Right ( ExcelPath , 1 ) <> "\" Then ExcelPath = ExcelPath + "\"
+	
+ExcelFiles: 
+	ExcelFiles = Inputbox$ ( "Enter Excel Filename (or wildcard for multiple files)" , "Excel Import" , "*.xls" )
+	If ExcelFiles = "" Then
+		BoxType& = 1 ' MB_OKCANCEL
+		answer = Messagebox ("Please enter the Excel Filename" , BoxType& , "Enter Excel Filename" )
+		If answer = 2 Then
+			Goto finish
+		Else
+			Goto ExcelFiles 
+		End If
+	End If
+	ExcelFile = Dir$ ( ExcelPath + ExcelFiles )
+	If ExcelFile = "" Then
+		Goto NoFile
+	End If
+	' ##### FOR EACH FILE IN THE DIRECTORY #####
+	While ExcelFile<>""
+		Set xls = GetObject ( ExcelPath + ExcelFile , "" )
+		' ##### FOR EACH SHEET IN THE FILE #####
+		Forall sheet In xls.Worksheets
+			Print "Started IMPORT Cycle"
+			DocCounter = 1
+			' ##### GET FIELD NAMES FROM SECOND ROW #####
+			For cellCol = 0 To 25
+				If Len ( sheet.range( Chr(cellCol + 64 + 1 ) & "2" ).value ) > 0 Then
+					' ##### LIMITED TO 26 ALPHA CHARACTERS #####
+					If Len ( CellNames ( Ubound ( CellNames ) ) ) > 0 Then 
+						Redim Preserve CellNames ( Ubound ( CellNames ) + 1)
+					End If 
+					CellNames(Ubound(CellNames)) = sheet.range ( Chr(cellCol + 64 + 1 ) & Ltrim ( Str ( 2 ) ) ).value
+				Else
+					Exit For
+				End If
+			Next
+			' ##### GET FIELD VALUES FROM ALL NON-BLANK ROWS #####
+			cellRow = 3
+			While cellRow > 0 
+				For cellCol = Lbound(CellNames) To Ubound(CellNames)
+					If Len ( sheet.range( Chr ( cellCol + 64 + 1 ) & Ltrim ( Str ( cellRow ) ) ).value ) > 0 Then
+					' ##### LIMITED TO 26 ALPHA CHARACTERS #####
+						If Len ( CellValues ( Ubound ( CellValues ) ) ) > 0 Then 
+							Redim Preserve CellValues ( Ubound ( CellValues ) + 1)
+						End If
+						CellValues ( Ubound ( CellValues ) ) = sheet.range ( Chr ( cellCol + 64 + 1 ) & Ltrim ( Str ( cellRow ) ) ).value
+					Else
+						Exit For
+					End If
+				Next
+				If Chr ( cellCol + 64 + 1 ) = "A" Then
+					If Len ( sheet.range( Chr ( cellCol + 64 + 1 ) & Ltrim ( Str ( cellRow ) ) ).value ) = 0 Then
+						Msgbox "No Documents"
+						cellRow = 0
+					End If
+				Else 
+					' ##### CREATE NEW DOCUMENT #####
+					Set Doc = New NotesDocument(db)
+					' ##### FORM NAME COMES FROM ROW 1 COLUN 1 #####
+					Doc.Form = sheet.range( "A1" ).value
+				     ' ##### CREATE FIELDS AND SET VALUES #####
+					For fieldNum = Lbound(CellNames) To Ubound(CellNames)
+						Call Doc.ReplaceItemValue( CellNames(fieldNum) , CellValues(fieldNum) )
+					Next
+					DocCounter = DocCounter + 1 
+					Print "Importing Record # " & Str(DocCounter)
+					Call Doc.Save (True,True)
+					cellRow = cellRow + 1
+				End If
+			Wend 
+		End Forall
+		ExcelFile=Dir$
+	Wend
+	Goto Finish
+	
+NoFile:
+	BoxType& = 1 ' MB_OKCANCEL
+	answer = Msgbox ("There is no Excel file with ("& ExcelFiles &") name. Please check the Filename",BoxType&,"Excel File Information")
+	If answer = 2 Then
+		Goto finish
+	Else
+		Goto ExcelFiles 
+	End If
+	
+Finish: 
+End Sub
+
+
+
+
+
+
+Sub ImportUpdatesFromExcel
+	
+' The first cell of the first row is the form name
+' The second row must be all field names
+' The third and all consecutive rows are records to modify
+' The first column is the key
+' A blank column will limit the number of fields imported
+' A blank row will limit the number of new entries
+	
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim Doc As NotesDocument
+	Dim TempDate As New NotesDateTime ("") 
+	Dim ExcelPath As String
+	Dim ExcelFiles As String
+	Dim ExcelFile
+	Dim SheetName As String
+	Dim BoxType As Long	
+	Dim DocCounter As Integer 
+	Dim DocCounterNew As Integer
+	Dim createNew As Integer
+	Dim answer As Integer
+	Dim cellCol As Integer
+	Dim cellRow As Integer
+	Dim colBlank As Integer
+	Dim rowBlank As Integer
+	Dim fieldNum As Integer
+	Redim cellNames(0) As String
+	Redim cellValues(0) As String
+	Dim xls
+	
+	Dim coll As NotesDocumentCollection
+	Dim searchFormula As String
+	Dim bday As NotesDateTime
+	
+	Set bday = New NotesDateTime ( "01/22/1973" )
+	
+	Set db = s.CurrentDatabase
+	
+ExcelPath: 
+	ExcelPath = Inputbox$ ("Enter Excel File Directory","Excel Import","C:\Documents and Settings\whaleb\desktop")
+	' ExcelPath = Inputbox$ ("Enter Excel File Directory","Excel Import","C:\Temp")
+	If ExcelPath = "" Then
+		BoxType& = 1 'MB_OKCANCEL
+		answer = Messagebox ("Please enter the Excel File Directory Path",BoxType&,"Enter Excel File Directory")
+		If answer = 2 Then
+			Goto finish
+		Else
+			Goto ExcelPath 
+		End If
+	End If
+	If Right ( ExcelPath , 1 ) <> "\" Then ExcelPath = ExcelPath + "\"
+	
+ExcelFiles: 
+	ExcelFiles = Inputbox$ ( "Enter Excel Filename (or wildcard for multiple files)" , "Excel Import" , "*.xls" )
+	If ExcelFiles = "" Then
+		BoxType& = 1 ' MB_OKCANCEL
+		answer = Messagebox ("Please enter the Excel Filename" , BoxType& , "Enter Excel Filename" )
+		If answer = 2 Then
+			Goto finish
+		Else
+			Goto ExcelFiles 
+		End If
+	End If
+	ExcelFile = Dir$ ( ExcelPath + ExcelFiles )
+	If ExcelFile = "" Then
+		Goto NoFile
+	End If
+	' ##### FOR EACH FILE IN THE DIRECTORY #####
+	While ExcelFile<>""
+		Set xls = GetObject ( ExcelPath + ExcelFile , "" )
+		' ##### FOR EACH SHEET IN THE FILE #####
+		Forall sheet In xls.Worksheets
+			Print "Started IMPORT Cycle"
+			DocCounter = 1
+			DocCounterNew = 1
+			
+			' ##### GET FIELD NAMES FROM SECOND ROW #####
+			For cellCol = 0 To 25
+				If Len ( sheet.range( Chr(cellCol + 64 + 1 ) & "2" ).value ) > 0 Then
+					' ##### LIMITED TO 26 ALPHA CHARACTERS #####
+					If Len ( CellNames ( Ubound ( CellNames ) ) ) > 0 Then 
+						Redim Preserve CellNames ( Ubound ( CellNames ) + 1)
+					End If 
+					CellNames(Ubound(CellNames)) = sheet.range ( Chr(cellCol + 64 + 1 ) & Ltrim ( Str ( 2 ) ) ).value
+				Else
+					Exit For
+				End If
+			Next
+			' Msgbox "Field Count = " + Cstr ( Lbound ( CellNames ) ) + " to " + Cstr ( Ubound ( CellNames ) )
+			
+			cellRow = 3
+			While cellRow > 0 
+				' ##### GET FIELD VALUES FROM ALL NON-BLANK ROWS #####
+				For cellCol = Lbound ( CellNames ) To Ubound ( CellNames )
+					' ##### LIMITED TO 26 ALPHA CHARACTERS #####
+					If cellCol > 0 Then 
+						Redim Preserve CellValues ( Ubound ( CellValues ) + 1)
+					End If 
+					CellValues ( Ubound ( CellValues ) ) = sheet.range ( Chr ( cellCol + 64 + 1 ) & Ltrim ( Str ( cellRow ) ) ).value
+				Next
+				
+				' ##### IF FIRST COL ( KEY ) IS BLANK , STOP #####
+				If Len ( sheet.range( "A" & Ltrim ( Str ( cellRow ) ) ).value ) = 0 Then
+					Msgbox "No Documents"
+					cellRow = 0
+					Goto Finish
+				End If
+				
+				' Msgbox "Field Value Count = " + Cstr ( Lbound ( CellValues ) ) + " to " + Cstr ( Ubound ( CellValues ) )
+				
+					' ##### FIND EXISTING DOCUMENT DOCUMENT #####
+				searchFormula$ = "Form = '" + sheet.range( "A1" ).value + "' & " + _
+				CellNames(0) + " = '" + CellValues(0) + "'  "
+				' Msgbox searchFormula
+				Set coll = db.Search ( searchFormula$ , bday, 0 )
+				' Msgbox Cstr ( coll.count ) & " records found "
+				If coll.count = 1 Then
+					Set doc = coll.getFirstDocument
+				     ' ##### REPLACE FIELD VALUES AND SAVE #####
+					For fieldNum = Lbound(CellNames) To Ubound(CellNames)
+						Call Doc.ReplaceItemValue( CellNames(fieldNum) , CellValues(fieldNum) )
+					Next
+					Print "Modifying Record # " & Str ( DocCounter )
+					DocCounter = DocCounter + 1 
+					Call Doc.Save (True,True)
+				Elseif coll.count > 1 Then
+					Msgbox "Row # " & Cstr(cellRow) & " has too many matches and has been skipped"
+				Elseif coll.count < 1 Then
+					' Msgbox "Row # " & Cstr(cellRow) & " has no matches and has been skipped"
+					
+					
+					
+					createNew = Msgbox ( "Row # " & Cstr(cellRow) & " has no matches.  Create a new document?" , 4 )
+					' ##### YESNO MSGBOX
+					If createNew = 6 Then ' ##### YES BUTTON
+					     ' ##### CREATE A NEW DOCUMENT - ONE WAS NOT FOUND #####
+						Set Doc = New NotesDocument(db)
+				     	' ##### FORM NAME COMES FROM ROW 1 COLUN 1 #####
+						Doc.Form = sheet.range( "A1" ).value
+				          ' ##### CREATE FIELDS AND SET VALUES #####
+						For fieldNum = Lbound(CellNames) To Ubound(CellNames)
+							Call Doc.ReplaceItemValue( CellNames(fieldNum) , CellValues(fieldNum) )
+						Next
+						Print "Importing Record # " & Str ( DocCounterNew )
+						DocCounterNew = DocCounterNew + 1 
+						Call Doc.Save (True,True)
+					End If
+					
+					
+					
+				End If
+					' ##### RESET AND INCREMENT #####
+				cellRow = cellRow + 1
+				Redim CellValues(0)
+			Wend 
+		End Forall
+		ExcelFile=Dir$
+		
+	Wend
+	Goto Finish
+	
+NoFile:
+	BoxType& = 1 ' MB_OKCANCEL
+	answer = Msgbox ("There is no Excel file with ("& ExcelFiles &") name. Please check the Filename",BoxType&,"Excel File Information")
+	If answer = 2 Then
+		Goto finish
+	Else
+		Goto ExcelFiles 
+	End If
+	
+Finish: 
+End Sub

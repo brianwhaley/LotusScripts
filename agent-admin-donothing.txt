@@ -1,0 +1,23 @@
+Option Public
+Option Explicit
+
+
+
+
+
+
+Sub Initialize
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim server_name As String
+	Set doc = s.DocumentContext
+	Set db = doc.ParentDatabase
+	server_name = Right$ ( Cstr ( db.Server ) , Cint ( Len ( Cstr ( db.Server ) ) ) - 3 )
+	server_name = Left$ ( Cstr ( server_name ) , Cint ( Instr ( Cstr ( server_name )  , "/" ) ) - 1 )
+	If doc.redirect(0) <> "" Then 
+		Print "[" + doc.redirect(0) + "]"
+	Else 
+		Print "[" + "http://" + server_name + ".bms.com" + "/" + db.FilePath + "/0/" + doc.UniversalID + "]"	
+	End If
+End Sub

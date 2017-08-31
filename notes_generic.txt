@@ -1,0 +1,549 @@
+Option Public
+Option Declare
+
+
+
+
+Dim db As NotesDatabase
+Dim doc As NotesDocument
+Dim newVersion As NotesDocument
+
+
+
+
+
+Sub PersonInfo ( key As String) 
+	Dim session As New notessession
+	Dim db1 As notesdatabase
+	Dim db As notesdatabase
+	Dim view As notesview
+	Dim doc As NotesDocument
+	Dim tmp As Variant
+	Dim org,loct,phone,fax,email As Variant
+	Set db1 = session.currentdatabase
+	If db1.server = "" Then
+		Set db = session.getdatabase(db1.server,"bellpna.nsf")
+	Else
+		Set db = session.getdatabase(db1.server,"names.nsf")
+	End If
+	Set view = db.getview("($By EID)")
+	Set doc=view.getDocumentByKey(key)
+	If doc Is Nothing Then
+		Msgbox "No Info on person " & key
+	Else
+		org = doc.getItemValue("Department")
+		loct = doc.getItemValue("Location")
+		phone = doc.getItemValue("OfficePhoneNumber")
+		fax = doc.getItemValue("OfficeFAXPhoneNumber")
+		email = doc.getItemValue("ShortName")
+		email(0) = email(0) + "@telcordia.com"
+		Msgbox "NAME : " & key & Chr(10) &_
+		"ORG : " & org(0) & Chr(10) &_
+		"LOCATION : " & loct(0) & Chr(10) &_
+		"PHONE : " & phone(0) & Chr(10) &_
+		"FAX : " & fax(0) & Chr(10) &_
+		"EMAIL : " &email(0) , 64 , key
+	End If
+End Sub
+
+
+
+
+Sub SoftDelete
+	Dim session As New NotesSession
+	Dim ws As New NotesUIWorkspace
+	Dim db As Notesdatabase
+	Dim coll As NotesDocumentCollection
+	Dim doc As NotesDocument  
+	Dim i , x As Integer
+	Dim user As String
+	user = session.CommonUserName
+	Set db = Session.CurrentDatabase     
+	Set coll = db.UnprocessedDocuments  
+	If coll.Count = 0 Then
+		x = Messagebox(" You have not checked off any documents.", 48 ,"No Documents Selected" )
+		Exit Sub          
+	End If
+	Set doc = coll.getFirstDocument
+	
+     ' ********** DELETING THE DOCUMENT **********
+	If Cstr ( doc.getFirstItem( "Trash" ).values(0) ) <> "Yes" Then
+		For i = 1 To coll.Count
+			Set doc = coll.GetNthDocument(i)
+			Call doc.ReplaceItemValue("Trash","Yes")
+			doc.WhoDoneIt = user
+			Call doc.Save(True, False)    
+			Call ws.ViewRefresh
+		Next
+		
+     ' ********** UN-DELETING THE DOCUMENT **********
+	Else                                                                                                 
+		For i = 1 To coll.Count
+			Set doc = coll.GetNthDocument(i)
+			Call doc.ReplaceItemValue("Trash","")
+			doc.WhoDoneIt = user
+			Call doc.Save(True, False)    
+			Call ws.ViewRefresh
+		Next
+	End If
+End Sub
+
+
+
+
+
+
+Function GetDBPath
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Set db = s.currentdatabase
+	If Instr ( db.filepath , "\" ) Then
+		GetDBPath = Left$ ( db.filepath , Instr ( db.filepath , "\" ) - 1 ) + "/" + Right$ ( db.filepath ,Len ( db.filepath ) - Instr ( db.filepath , "\" ) )
+	Else
+		GetDBPath = db.filepath
+	End If  
+End Function
+
+
+
+
+
+
+Sub ChangeField_Old
+     ' fieldName := @Prompt([OKCANCELEDIT]; "Field Name"; "Please enter the name of the field you would like to modify." ; "") ;
+     ' fieldValue := @Prompt([OKCANCELEDIT]; "Field Value"; "Please enter the value of " + fieldName + "." ; "") ;
+     ' @SetField ( fieldName ; fieldValue );
+     ' SELECT @All
+End Sub
+
+
+
+
+
+Sub ChangeFieldValues_R4
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim coll As NotesDocumentCollection
+	Dim doc As NotesDocument
+	Dim this_field As String
+	Dim this_value As String
+	Dim i As Integer
+	
+	Set db = s.CurrentDatabase
+	Set coll = db.UnprocessedDocuments
+	
+	this_field$ = Cstr ( Inputbox ( "What is the name of the field you would like to change?" , "Change Field - Field Name" , "" , 200 , 200 ) )
+	this_value$ = Cstr ( Inputbox ( "What is the name of the new value for " + this_field + "?" , "Change Field - Field Value" , "" , 200 , 200 ) )
+	
+	For i = 1 To coll.count
+		Set doc = coll.GetNthDocument ( i )
+		Call doc.ReplaceItemValue ( this_field , this_value )
+		Call doc.Save ( True , True )
+		Print "Document " + Cstr ( i ) + " - " + this_field + " changed to " + this_value
+	Next
+	
+End Sub
+
+
+
+
+
+Sub ChangeFieldValue_R5
+	Dim s As New NotesSession
+	Dim w As New NotesUIWorkspace
+	Dim coll As NotesDocumentCollection
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim notesItem As NotesItem
+	Dim form As NotesForm
+	Dim formName As String
+	Dim fieldNames() As String
+	Dim newValue As String
+	Dim continue As String
+	Dim fieldChoice As Variant
+	Dim fieldChoiceList As Variant
+	Dim i As Integer
+	Dim confirm As Integer
+	Set db = s.CurrentDatabase
+	Set coll = db.UnprocessedDocuments
+	If ( coll.Count = 0 ) Then
+		Msgbox "You have not selected any documents to change.", 0 , "Error:"
+		Exit Sub
+	End If
+	Set doc = coll.GetFirstDocument
+	formName = doc.Form(0)
+	i = 0
+	Set form = db.GetForm ( formName )
+	Forall item In doc.Items
+		Redim Preserve fieldNames(i)
+		' ( Left ( item.Name, 1 ) <> "$" ) And
+		If  ( item.Type <> RICHTEXT ) And ( item.Name <> "UNID" ) And ( item.Name <> "FORM" ) Then
+			fieldNames(i) = item.Name
+			i = i + 1
+		End If
+	End Forall
+	fieldChoiceList= SortArray ( fieldNames )
+	fieldChoice = w.Prompt ( PROMPT_OKCANCELLIST, "Field Name:", "Please choose the name of the field you would like to change.", fieldChoiceList(0), fieldChoiceList )
+	If fieldChoice <> "" Then
+		Set notesItem = doc.GetFirstItem ( fieldChoice )
+		newValue = Inputbox ( "What is the new value for this field?", "New Value:", notesItem.Text )
+		confirm = Msgbox ( "Are you sure you want to change the " & Cstr ( fieldChoice ) & " field to """ & newValue & """ for all selected documents?", 1, "Confirm Change:" )
+		If ( confirm <> 1 ) Then Exit Sub
+		Do Until ( doc Is Nothing )
+			Set notesItem = doc.GetFirstItem ( fieldChoice )
+			notesItem.Values = newValue
+			Call doc.Save ( True, True )
+			Set doc = coll.GetNextDocument ( doc )
+		Loop
+	Else
+		Msgbox ( "No items have been changed" )
+		Exit Sub
+	End If
+End Sub
+
+
+
+
+Sub RecordNumber_old
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim coll As NotesDocumentCollection
+	Dim agent As NotesAgent
+	Dim doc As NotesDocument
+	Dim collDoc As NotesDocument
+	Dim newVersion As NotesDocument
+	Dim searchFormula As String
+	Dim bday As New NotesDateTime ( "01/22/1973" )
+	Dim lastRecordNum As Integer
+	Dim i As Integer
+	
+	Set doc=s.DocumentContext
+	Set db = doc.ParentDatabase
+	lastRecordNum = 0
+	If doc.isNewNote Then
+		searchFormula$ = "Form = '" + doc.Form(0) + "' & RecordNumber != """"  "
+		Set coll = db.Search ( searchFormula$ , bday, 0 )
+		If coll.count > 0 Then
+			For i = 1 To coll.count
+				Set collDoc = coll.getNthDocument ( i )
+				If ( Cstr ( collDoc.RecordNumber(0) ) <> "" ) Then
+					If Cint ( Cstr ( collDoc.RecordNumber ( 0 ) ) ) > Cint ( lastRecordNum ) Then
+						lastRecordNum = Cint ( collDoc.RecordNumber ( 0 ) ) 
+						' Print ( Cstr ( i ) + " documents analyzed , lastRecordNum = " + Cstr ( lastRecordNum ) )
+					End If
+				End If
+			Next
+		End If 
+		doc.RecordNumber = lastRecordNum + 1
+		Call doc.Save ( True , True )
+	End If	
+End Sub
+
+
+
+
+Sub RecordNumber
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim view As NotesView
+	Dim agent As NotesAgent
+	Dim doc As NotesDocument
+	Dim viewDoc As NotesDocument
+	Dim lastRecordNum As Integer
+	Dim i As Integer
+	
+	Set doc =s .DocumentContext
+	Set db = doc.ParentDatabase
+	lastRecordNum = 0
+	If doc.isNewNote Then
+		Set view = db.getView ( doc.Form(0) + "_rec_num" )
+		Set viewDoc = view.getlastdocument
+		Do While lastRecordNum = 0
+			If ( Cstr ( viewDoc.RecordNumber(0) ) <> "" ) Then
+				If Cint ( Cstr ( viewDoc.RecordNumber ( 0 ) ) ) > Cint ( lastRecordNum ) Then
+					lastRecordNum = Cint ( viewDoc.RecordNumber ( 0 ) ) 				
+				End If
+			End If
+			Set viewDoc = view.getPrevDocument ( viewDoc )
+		Loop		
+		doc.RecordNumber = lastRecordNum + 1
+		Call doc.Save ( True , True )
+	End If	
+End Sub
+
+
+
+
+
+Sub ChangeUniversalID
+	
+	Dim s As NotesSession
+	Dim db As NotesDatabase
+	Dim coll As NotesDocumentCollection
+	Dim agent As NotesAgent
+	Dim view As NotesView
+	Dim doc As NotesDocument
+	Dim item As NotesItem
+	Dim searchFormula As String
+	Dim bday As NotesDateTime
+	Dim i As Integer
+	
+	Set s = New NotesSession
+	Set agent = s.CurrentAgent
+	Set doc=s.DocumentContext
+	Set db = doc.ParentDatabase
+	' Set view = db.GetView ( "" )
+	Set bday = New NotesDateTime ( "01/22/1973" )
+	searchFormula$ = "Form = '" + doc.Form(0) + "' & RecordNumber = ''  "
+	' Set coll = db.Search ( searchFormula$ , bday, 0 )
+	Set coll = db.unprocesseddocuments
+	
+	Dim unid As String
+	unid = Inputbox ( "What is the new UNID for these documents?", "New Value:", "" )
+	
+	For i = 1 To coll.count
+		Set doc = coll.getnthdocument ( i )
+		doc.universalid = unid
+		Call doc.save ( True , True )
+		' Call doc.remove ( True )
+	Next
+	
+End Sub
+
+
+
+
+
+Sub CreateVersion
+	Dim s As New NotesSession
+	
+	Set doc=s.DocumentContext
+	Set db = doc.ParentDatabase
+	
+	' If Not note.isNewNote And note.SaveAsNewVersion(0) = "1" Then ' ' ' save old version 
+	If Not doc.isNewNote Then
+		Set newVersion = New NotesDocument ( db ) ' db.CreateDocument
+		Call doc.copyAllItems ( newVersion )
+		Call newVersion.makeResponse ( doc )
+		Call newVersion.Save ( True , True )
+		doc.SaveOptions = "0"
+	End If	
+End Sub
+
+
+
+
+
+Sub MakeAboutAccesibleToPublic
+     ' You must also have at least one view set to public access, or the user will not be able to view the "About"
+     ' document. So, create a public access view that has displays no documents or fields. Finally, set the ACL on the
+     ' database to "Read Public Documents"
+	Dim session As New NotesSession 
+	Dim db As NotesDatabase '
+	Set db = session.GetDatabase("","databasenamel.nsf") 
+	Dim doc As NotesDocument 
+	Set doc = db.GetDocumentByUNID("85255A0A0010AC8E852558BF00737B2A")
+	Dim PublicAccess As New NotesItem( doc, "$PublicAccess", "1" )
+	Call doc.Save(True,True)
+End Sub
+
+
+
+
+
+Function SpoofMailMessage( Byval sendas As String, Byval sendto As String, subject As String, message As String )
+	Dim session As New NotesSession 
+	Dim mailbox As New NotesDatabase("","")
+	Dim current As NotesDatabase 
+	Dim maildoc As NotesDocument 
+	Dim rtitem As NotesRichTextItem
+	Set current = session.CurrentDatabase
+	Call mailbox.Open( current.server, "mail.box" )
+	Set maildoc = mailbox.CreateDocument
+	maildoc.Form = "Memo"
+	maildoc.From = sendas
+	maildoc.SendFrom = sendas
+	maildoc.SendTo = sendto
+	maildoc.Recipients = sendto
+	maildoc.Subject = subject
+	Set rtitem = maildoc.CreateRichTextItem( "Body" )
+	Call rtitem.AppendText( message )
+	maildoc.PostedDate = Now()
+	maildoc.ComposedDate = Now()
+	maildoc.DeliveredDate = Now()
+	maildoc.Principal = sendas
+	maildoc.EncryptOnSend = False
+	Call maildoc.Save( True, False )
+End Function
+
+
+
+
+
+Sub ChildToParent
+	
+	Dim s As New NotesSession
+	Dim w As New NotesUIWorkspace
+	Dim coll As NotesDocumentCollection
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim parentDoc As NotesDocument
+	Dim newValue As String
+	Dim confirm As Integer
+	Set db = s.CurrentDatabase
+	Set coll = db.UnprocessedDocuments
+	If ( coll.Count < 0 ) Then
+		Msgbox "You have not selected any documents to change.", 0 , "Error:"
+		Exit Sub
+	End If
+	Set doc = coll.GetFirstDocument		
+	newValue = Inputbox ( "What is the Parent UNID for these documents?", "New Value:", "" )
+	confirm = Msgbox ( "Are you sure you want to make these a child document to """ & newValue & """ for all selected documents?", 1, "Confirm Change:" )
+	If ( confirm <> 1 ) Then Exit Sub
+	Set parentDoc = db.GetDocumentByUNID( newValue )
+	If Not ( parentDoc Is Nothing ) Then
+		Do Until ( doc Is Nothing )
+			doc.Vendor = parentDoc.Vendor
+			doc.app_name = parentDoc.app_name
+			doc.app_version = parentDoc.app_version
+			Call doc.MakeResponse ( parentDoc )
+			Call doc.Save ( True, True )
+			Set doc = coll.GetNextDocument ( doc )
+		Loop
+	End If
+	
+End Sub
+
+
+
+
+Function PercentComplete ( default As Integer, current As Double, total As Double) As String
+     ' PUT THIS LINE OF CODE INTO THE INITIALIZE
+     ' Print PercentComplete ( 100 , Cdbl ( CurrentRecordNumber ) , Cdbl ( coll.Count ) )
+	Dim indicator As String
+	Dim length As Integer
+	Dim count As Integer
+	Dim ind_count As Integer
+	indicator = Chr ( 127 )
+	For ind_count = 1 To default
+		indicator = indicator + "-"
+	Next ind_count
+	indicator = indicator + Chr(127) + "  0% Complete"
+	PercentComplete = indicator
+	length = ( current * default ) / Total
+	If length >0 Then
+		For count = 2 To length +1
+			Mid ( PercentComplete , count, 1) = Chr(127)
+		Next count
+	End If
+	Mid ( PercentComplete , default + 4 , 4 ) = Cstr ( Cint ( ( current / total ) * 100 ) ) + "%"
+End Function 
+
+
+
+
+Function SortArray ( inarray As Variant ) As Variant
+	Dim i , j , max As Integer
+	Dim array As Variant
+	Dim v As Variant
+	array = inarray
+	max = Ubound ( array )
+	For i = 0 To max - 1
+		For j = i + 1 To max
+			If array ( i ) > array ( j ) Then
+				v = array ( i )
+				array ( i ) = array ( j )
+				array ( j ) = v
+			End If
+		Next
+	Next
+	SortArray = array
+End Function
+
+
+
+
+Sub CGIVariables
+%REM
+DESC: Use this script to return all of the CGI Variables from the browser.
+The documentContext property of NotesSession returns the in-memory document
+created by Domino when a form or document is accessed. Call this agent in either
+the WebQueryOpen or WebQuerySave event of the form or explicitly with the RunAgent URL command.
+USAGE: Copy into a Domino agent or use the File Import command to insert the text file.
+PLATFORMS: Lotus Domino Server 4.5 and higher
+%END REM
+	Dim s As New NotesSession
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim cgiVariables(1 To 22) As String
+	Dim cgiNames(1 To 22) As String
+	Dim i As Integer
+	
+	Set db = s.currentDatabase
+	Set doc = s.DocumentContext
+	
+     'these next lines fill the array with the return values of the variables. If the variable is blank, then replace it with N/A.
+	If doc.auth_type(0) = "" Then cgiVariables(1) = "N/A" Else cgiVariables(1) = doc.auth_type(0)
+	If doc.Content_Length(0) = "" Then cgiVariables(2) = "N/A" Else   cgiVariables(2) = doc.Content_Length(0)
+	If doc.Content_Type(0) = "" Then cgiVariables(3) = "N/A" Else   cgiVariables(3) = doc.Content_Type(0)
+	If doc.Gateway_Interface(0) = "" Then cgiVariables(4) = "N/A" Else    cgiVariables(4) = doc.Gateway_Interface(0)
+	If doc.HTTP_Accept(0) = "" Then cgiVariables(5) = "N/A" Else  cgiVariables(5) = doc.HTTP_Accept(0)
+	If doc.HTTP_Referer(0) = "" Then cgiVariables(6) = "N/A" Else   cgiVariables(6) = doc.HTTP_Referer(0)
+	If doc.HTTPS(0) = "" Then cgiVariables(7) = "N/A" Else   cgiVariables(7) = doc.HTTPS(0)
+	If doc.HTTP_User_Agent(0) = "" Then cgiVariables(8) = "N/A" Else   cgiVariables(8) = doc.HTTP_User_Agent(0)
+	If doc.Path_Info(0) = "" Then cgiVariables(9) = "N/A" Else  cgiVariables(9) = doc.Path_Info(0)
+	If doc.Path_Translated(0) = "" Then cgiVariables(10) = "N/A" Else  cgiVariables(10) = doc.Path_Translated(0)
+	If doc.Query_String(0) = "" Then cgiVariables(11) = "N/A" Else cgiVariables(11) = doc.Query_String(0)
+	If doc.Remote_Addr(0) = "" Then cgiVariables(12) = "N/A" Else   cgiVariables(12) = doc.Remote_Addr(0)
+	If doc.Remote_Host(0) = "" Then cgiVariables(13) = "N/A" Else    cgiVariables(13) = doc.Remote_Host(0)
+	If doc.Remote_Ident(0) = "" Then cgiVariables(14) = "N/A" Else    cgiVariables(14) = doc.Remote_Ident(0)
+	If doc.Remote_User(0) = "" Then cgiVariables(15) = "N/A" Else   cgiVariables(15) = doc.Remote_User(0)
+	If doc.Request_Method(0) = "" Then cgiVariables(16) = "N/A" Else    cgiVariables(16) = doc.Request_Method(0)
+	If doc.Script_Name(0) = "" Then cgiVariables(17) = "N/A" Else   cgiVariables(17) = doc.Script_Name(0)
+	If doc.Server_Name(0) = "" Then cgiVariables(18) = "N/A" Else   cgiVariables(18) = doc.Server_Name(0)
+	If doc.Server_Protocol(0) = "" Then cgiVariables(19) = "N/A" Else   cgiVariables(19) = doc.Server_Protocol(0)
+	If doc.Server_Port(0) = "" Then cgiVariables(20) = "N/A" Else   cgiVariables(20) = doc.Server_Port(0)
+	If doc.Server_Software(0) = "" Then cgiVariables(21) = "N/A" Else    cgiVariables(21) = doc.Server_Software(0)
+	If doc.Server_URL_Gateway_Interface(0) = "" Then cgiVariables(22) = "N/A" Else    cgiVariables(22) = doc.Server_URL_Gateway_Interface(0)
+	
+     'These lines fill an array with the name of the CGI Variable.
+	cgiNames(1) = "Auth_Type"
+	cgiNames(2) = "Content_Length"
+	cgiNames(3) = "Content_Type"
+	cgiNames(4) = "Gateway_Interface"
+	cgiNames(5) = "HTTP_Accept"
+	cgiNames(6) = "HTTP_Referer"
+	cgiNames(7) = "HTTPS"
+	cgiNames(8) = "HTTP_User_Agent"
+	cgiNames(9) = "Path_Info"
+	cgiNames(10) = "Path_Translated"
+	cgiNames(11) = "Query_String"
+	cgiNames(12) = "Remote_Addr"
+	cgiNames(13) = "Remote_Host"
+	cgiNames(14) = "Remote_Ident"
+	cgiNames(15) = "Remote_User"
+	cgiNames(16) = "Request_Method"
+	cgiNames(17) = "Script_Name"
+	cgiNames(18) = "Server_Name"
+	cgiNames(19) = "Server_Protocol"
+	cgiNames(20) = "Server_Port"
+	cgiNames(21) = "Server_Software"
+	cgiNames(22) = "Server_URL_Gateway_Interface"
+	
+'Creates an HTML table and fills it with the information
+	Print "<HTML><HEAD><TITLE>CGI Variables from Domino</TITLE></HEAD><BODY TEXT=""000000"">"
+	Print "<H2>CGI Variables from application " + db.title + "</H2><BR>"
+	
+	Print "<TABLE BORDER=1>"
+	Print "<TR><TD><B>Name</B></TD><TD><B>Value</B></TD></TR>"
+	For i = 1 To 22
+		Print "<TR><TD><B>" + cgiNames(i) + "</B></TD><TD>" + cgiVariables(i) + "</TD></TR>"
+	Next 
+	Print "</TABLE>"
+	Print "</BODY></HTML>"
+	
+End Sub
+
+
+
+

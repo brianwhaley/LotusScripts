@@ -1,0 +1,36 @@
+
+Option Public
+Option Explicit
+
+
+
+
+
+Dim s As NotesSession
+Dim db As NotesDatabase
+Dim agent As NotesAgent
+
+
+Sub Initialize
+	Set s = New NotesSession
+	Set db = s.CurrentDatabase
+	Set agent = s.CurrentAgent
+	
+	Dim currentLog As New NotesLog ( db.title )
+	Call currentLog.OpenNotesLog ("","LOGS\AGENTLOG.NSF")
+	On Error Goto ProcessError
+	Call currentLog.LogAction ( db.title & " : Start Agent Processing : " & agent.name)
+	
+	Print ( "[" + db.FilePath + "]" )
+	
+	' End agent tracking
+	Call currentLog.LogAction ( db.title & " : End Agent Processing : " & agent.name )
+	
+	' ByPass the error processing routine
+	Exit Sub
+	
+ProcessError:
+	Call currentLog.LogError ( Err() , Error() )
+	Call currentLog.Close
+	Exit Sub	
+End Sub

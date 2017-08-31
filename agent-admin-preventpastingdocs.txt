@@ -1,0 +1,10 @@
+FIELD Trash := Trash ;
+FIELD WhoDoneIt :=  WhoDoneIt ;
+@If ( @IsMember ( "[Admin]" ; @UserRoles ) ; "" ;
+     @Do (
+          @Prompt([OK]; "Not Authorized"; "You are not authorized to perform this function");
+          @SetField("WhoDoneIt";@Name([CN];@UserName));
+          @SetField("Trash";"Trashed")
+     )
+) ;
+SELECT @All

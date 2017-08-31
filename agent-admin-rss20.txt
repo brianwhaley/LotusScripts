@@ -1,0 +1,74 @@
+Option Public
+Option ExplicitSub Initialize
+	Dim s As NotesSession
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim view As NotesView
+	Dim source As String
+	Dim server_name As String
+	Dim count As Integer
+	
+	Set s = New NotesSession
+	Set db = s.CurrentDatabase
+	Set view = db.getView ( "vToday_rss20" )
+	count = 0
+	server_name = "epost"
+	
+	Print "Content-type: text/xml"
+	Print "<?xml version=""1.0""?>"
+	Print "<rss version=""2.0"">"
+	Print "<TITLE>Today's ePost</TITLE>"
+	Print "<LINK>http://ePost.bms.com</LINK>"
+	Print "<DESCRIPTION>The Daily Electronic Messages of BMS</DESCRIPTION>"
+	Print "<LANGUAGE>en-us</LANGUAGE>"
+	Print "<COPYRIGHT>Copyright Bristol-Myers Squibb</COPYRIGHT>"
+	Print "<MANAGINGEDITOR>holly.rogaczewski@bms.com</MANAGINGEDITOR>"
+	Print "<WEBMASTER>brian.whaley@bms.com</WEBMASTER>"
+	Print "<PUBDATE>" + Date() + "</PUBDATE>"
+	Print "<TTL>1440</TTL>"
+	Print "<IMAGE>http://epost.bms.com/e/epost.nsf/todaysEPost.gif</IMAGE>"
+	Print "<channel>" + Chr(10) 
+	
+	Set doc = view.getFirstDocument
+	While Not ( doc Is Nothing )        
+		count = count + 1
+		source = ""
+		source = source + "<ITEM>" + Chr(10)
+		source = source + "<TITLE>" + ReplaceSubstring ( doc.Subject(0) , "&" , " and " ) + "</TITLE>" + Chr(10)
+		source = source + "<LINK>" + "http://epost.bms.com/e/epost.nsf/0/" + doc.UniversalID + "?open" + "</LINK>" + Chr(10)
+		source = source + "<AUTHOR>" + doc.AuthorEMailAddress(0) + "</AUTHOR>" + Chr(10)
+		Forall catval In doc.Cat
+			source = source + "<CATEGORY>" + catval + "</CATEGORY>" + Chr(10)
+		End Forall
+		source = source + "<GUID>" + doc.UniversalID + "</GUID>" + Chr(10)
+		source = source + "<PUBDATE>" + doc.GoLiveDate(0) + "</PUBDATE>" + Chr(10)
+		source = source + "</ITEM>" + Chr(10)
+		Print source
+		Set doc = view.getNextDocument ( doc )
+	Wend
+	Print "</channel>" + Chr(10)
+	Print "</rss>" + Chr(10)
+	
+End Sub
+
+
+
+
+Function ReplaceSubstring ( thisString As String, strFrom As String, strTo As String ) As String
+     ' Replace instances of strFrom to strTo in thisString
+	Dim strResult As String
+	Dim i As Integer
+	Dim strFromLength As Integer
+	Dim strResultLength As Integer
+	i = 0
+	strFromLength = Len ( strFrom )
+	strResult = thisString
+	Do While( i < Len ( strResult ) )
+		i = i + 1
+		If Mid$ ( strResult , i , strFromLength ) = strFrom Then
+			strResultLength = Len ( strResult )
+			strResult = Left$ ( strResult, ( i - 1) ) + strTo + Right$ ( strResult , strResultLength - ( ( i - 1) + ( strFromLength ) ) )
+		End If
+	Loop
+	ReplaceSubstring = strResult
+End Function

@@ -1,0 +1,169 @@
+import lotus.domino.*;
+import java.util.*;
+import java.io.*;
+import javax.mail.*;
+import javax.mail.internet.*;
+import javax.activation.*;
+import java.util.Properties;
+import java.util.Date;
+
+public class JavaAgent extends AgentBase {
+private static Log log;
+private static lotus.domino.Session Nsession;
+private static String EmailBody="";
+private static String Title="";
+private static String Bodytext1 = "";
+private static String Bodytext2 = "";
+private static String Bodytext3 = "";
+private static String BodyText = "";
+private static   RichTextItem body;
+//private Log log;
+  public void NotesMain() {
+    try {
+      lotus.domino.Session Nsession = getSession();
+      AgentContext agentContext = Nsession.getAgentContext();
+      
+      Log log = Nsession.createLog("Agent Log");      
+      log.openAgentLog();
+      log.logAction("start");
+      
+      
+      Database db = agentContext.getCurrentDatabase();
+      
+      View view = db.getView("emailformats");
+       Document doc = view.getFirstDocument();
+       if (doc != null) {
+      	Bodytext1 =  doc.getItemValueString("Lookupfield1") ;
+      	Bodytext2 =  doc.getItemValueString("Lookupfield2");
+		Bodytext3 =  doc.getItemValueString("Lookupfield3");
+       }
+      
+      
+      view = db.getView("NewsLetters");
+      doc = view.getFirstDocument();
+      while (doc != null) {
+       if (doc != null) {
+	       	EmailBody = doc.getItemValueString("Description");
+	       	body =       (RichTextItem)doc.getFirstItem("Description");
+//			EmailBody = "dsds";
+			Title = doc.getItemValueString("Title");
+       }
+      
+
+       log.logAction("Bodytext3 = " + BodyText);      
+       BodyText = Bodytext1 + Title + Bodytext2 + body.getFormattedText(false, 0, 0) +   Bodytext3;
+//       BodyText = Bodytext1 + Title + Bodytext2 + body +   Bodytext3;
+      JavaAgent.sendFrom("thomas.george@bms.com", Title, Bodytext1 + Title + Bodytext2 +   Bodytext3, "vanlev@bms.com",log );
+      
+      doc = view.getNextDocument(doc); 
+     }       
+    } catch(Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+public static   void print(String out)
+//public void print(String out)
+    {
+             try {
+//      lotus.domino.Session Nsession = getSession();
+//      log.logAction(out);
+//      log.close();
+
+         } catch(Exception e1) {
+    e1.printStackTrace();
+    }
+    }
+  public static void sendFrom(
+                              String  sendTo,
+                              String  subject,
+                              String  bodyText,
+                              String  from, Log log)
+    {
+      // mail variables
+
+      Properties props;
+      String    mailHost = "nsusmsg02.net.bms.com";
+      javax.mail.Session    session;
+
+      props = new Properties();
+      props.put("mail.smtp.host", mailHost);
+
+      session = javax.mail.Session.getDefaultInstance(props, null);
+      session.setDebug(true);
+      try
+      {
+      sendMsg(session,sendTo,from,subject,bodyText,log);       
+      }
+       catch(Exception e) {
+             try {
+      log.logAction("Error:    " + e.toString());
+      log.logAction("After sendMesg");
+         } catch(Exception e1) {
+    e1.printStackTrace();
+    }
+    e.printStackTrace();
+    }
+    }
+
+  static void sendMsg(
+                      javax.mail.Session session,
+                      String  sendTo,
+                      String  from,
+                      String  subject,
+                      String  bodyText, Log log)
+    {
+      try {
+//          print("Sending mail to:    " + sendTo);
+          print("Sending mail to:    ");
+
+        // create a mime message
+        MimeMessage mail = new MimeMessage(session);
+        mail.setFrom(new InternetAddress(from));
+        InternetAddress[] address = {new InternetAddress(sendTo)};
+        mail.setRecipients(Message.RecipientType.TO, address);
+        mail.setSubject(subject);
+
+      MimeMultipart mp = new MimeMultipart();
+      mp.setSubType("alternative");
+      MimeBodyPart b2 = new MimeBodyPart();       
+      b2.setContent(BodyText,"text/html; charset=\"iso-8859-1\"");       
+       mp.addBodyPart(b2);
+
+        // set the Date: header
+       mail.setSentDate(new Date());
+          // add the Multipart to the message
+
+      mail.setContent(mp);
+        // send the message
+
+      Transport.send(mail);
+
+         try {
+      log.logAction("After Send :    " + sendTo);
+         } catch(Exception e) {
+      e.printStackTrace();
+    }
+        
+      }
+      catch (Exception mex)
+        {
+ try {
+      log.logAction("Error:    " + mex.toString());
+         } catch(Exception e) {
+      e.printStackTrace();
+    }
+
+
+          print("SendTo:    " + sendTo);
+          print("From:      " + from);
+          print("Subject:    " + subject);
+          print("BodyText:  " + BodyText);
+      
+          print(mex.toString());
+          mex.printStackTrace();
+
+        }
+    }
+    }
+

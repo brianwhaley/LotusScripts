@@ -1,0 +1,11 @@
+FIELD BriefDescription :=
+@If ( !@Contains ( BriefDescription ; "[" ) ; "[<html>" ; "" ) +
+@ReplaceSubstring ( BriefDescription ; @Char(10) : @Char(13) : @NewLine : "<br>" : "<BR>" : "<Br>" : "<P>" : "</P>" ; "" ) +
+@If ( !@Contains ( BriefDescription ; "]" ) ; "</html>]" ; "" ) ;
+
+FIELD DetailedDescription :=
+@If ( !@Contains ( DetailedDescription ; "[" ) ; "[<html>" ; "" ) +
+@ReplaceSubstring ( DetailedDescription ; @Char(10) : @Char(13) : @NewLine : "<br>" : "<BR>" : "<Br>" : "<P>" : "</P>" ; "" ) +
+@If ( !@Contains ( DetailedDescription ; "]" ) ; "</html>]" ; "" ) ;
+
+SELECT @All

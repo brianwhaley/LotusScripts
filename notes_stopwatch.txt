@@ -1,0 +1,255 @@
+Option Public
+Option Explicit
+
+
+
+
+
+%REM
+To use the stopwatch to performance test your code:
+1.  Copy the "Stopwatch" Script library from this database to your database.
+2.  In the Options event of the code to be tested, add the line, Use "Stopwatch"
+3.  In the Declarations event of the code to be tested, add the line, Dim stopwatch As Stopwatch
+4.  At the start of the Initialize event, I add the line, Set stopwatch = New Stopwatch
+5.  In the code to be tested, added a bunch of Call stopwatch.Start ( Label$ ) and Call stopwatch.Stop ( Label$ ) pairs
+6.  At the end of the code to be tested, added the line, Call stopwatch.MailAllWatchValues(ReportRecipient$, ReportSubject$)
+%END REM
+
+'-------------------------------------------------------------------
+' Windows API declarations
+'-------------------------------------------------------------------
+Declare Function GetTickCount& Lib "kernel32" ()
+
+
+'-------------------------------------------------------------------
+' User-defined data types
+'-------------------------------------------------------------------
+'All information about a "Event Being Timed" will be stored in a list of type EventBeingTimedType
+Type EventBeingTimedType
+	lngPreviousRunTime As Long     'CPU time on the stopwatch from previous run(s) for an EventBeingTimed
+	lngThisRunStartTime As Long     'CPU time at which the running stopwatch was started for an EventBeingTimed. If lngThisRunStartTime is not zero, the watch is running for thig EventBeingTimed.  If it is zero, the watch is stopped for this EventBeingTimed.
+	lngStartCalls As Long     'Number of times the stopwatch has been started for this EventBeingTimed.
+End Type
+
+'ReportRowType is used to sort watch values when building a report.  Each EventBeingTimed becomes a array element of ReportRowType.
+Type ReportRowType
+	strName As String     'name of EventBeingTimed
+	lngRunTime As Long     'milliseconds active run time for an EventBeingTimed
+	lngStartCalls As Long     'number of times watch has been started for an EventBeingTimed
+End Type
+
+
+'-------------------------------------------------------------------
+'Stopwatch object class
+'-------------------------------------------------------------------
+Class Stopwatch
+	
+     'EventList is the main data store for the Stopwatch class.  EventList is an associative array.  The index into the array is the name of EventsBeingTimed.  The list contains elements of EventBeingTimedType .
+	Private EventList List As EventBeingTimedType
+	
+	
+     '-------------------------------------------------------------------
+     ' New
+     '-------------------------------------------------------------------
+	Sub New
+		EventList("Total run time").lngThisRunStartTime = GetTickCount()
+		EventList("Total run time").lngStartCalls = 1
+	End Sub
+	
+	
+     '-------------------------------------------------------------------
+     ' Start
+     ' If there is an EventBeingTimed with this name and the watch is already running, do nothing.
+     ' If there is an EventBeingTimed with this name but the watch isn't running, start the watch by placing the curent TickCount into lngThisRunStartTime for this EventBeingTimed.
+     ' If there is no EventBeingTimed with this name, create and start the watch by placing the curent TickCount into lngThisRunStartTime for this EventBeingTimed.
+     '-------------------------------------------------------------------
+	Sub Start(strEventBeingTimedName As String)
+		If (Iselement(EventList(strEventBeingTimedName))) Then
+			If (EventList(strEventBeingTimedName).lngThisRunStartTime <> 0) Then
+                    'Watch already running for this EventBeingTimed (do nothing)
+			Else
+                    'Watch stopped for this EventBeingTimed
+				EventList(strEventBeingTimedName).lngThisRunStartTime = GetTickCount()
+			End If
+		Else
+               'Start a watch for a new EventBeingTimed
+			EventList(strEventBeingTimedName).lngThisRunStartTime = GetTickCount()
+		End If
+		EventList(strEventBeingTimedName).lngStartCalls = EventList(strEventBeingTimedName).lngStartCalls + 1
+	End Sub
+	
+	
+     '-------------------------------------------------------------------
+     ' Stop
+     ' If there is an EventBeingTimed with this name and the watch is running for it:
+     '      PreviousRunTime = old previous + time from this run (current Tick Count - starting time)
+     '      Stop the stopwatch by setting lngThisRunStartTime to zero for this EventBeingTimed.
+     '-------------------------------------------------------------------
+	Sub Stop(strEventBeingTimedName As String)
+		If (Iselement(EventList(strEventBeingTimedName))) Then
+			If (EventList(strEventBeingTimedName).lngThisRunStartTime <> 0) Then
+				EventList(strEventBeingTimedName).lngPreviousRunTime = EventList(strEventBeingTimedName).lngPreviousRunTime + (GetTickCount() - EventList(strEventBeingTimedName).lngThisRunStartTime)
+				EventList(strEventBeingTimedName).lngThisRunStartTime = 0
+			End If
+		End If
+	End Sub
+	
+	
+     '-------------------------------------------------------------------
+     ' Reset
+     ' If there is an EventBeingTimed with this name, reset the PreviousRunTime, ThisRunStartTime, and StartCalls variables.
+     '-------------------------------------------------------------------
+	Sub Reset(strEventBeingTimedName As String)
+		If (Iselement(EventList(strEventBeingTimedName))) Then
+			EventList(strEventBeingTimedName).lngPreviousRunTime = 0
+			EventList(strEventBeingTimedName).lngThisRunStartTime = 0
+			EventList(strEventBeingTimedName).lngStartCalls = 0
+		End If
+	End Sub
+	
+	
+     '-------------------------------------------------------------------
+     ' GetTime
+     ' If there is an EventBeingTimed with this name and the watch is running, GetTime = PreviousRunTime + time from this run (current Tick Count - ThisRunStartTime)
+     ' If there is an EventBeingTimed with this name but the watch isn't running, GetTime =  PreviousRunTime
+     ' If there is no EventBeingTimed with this name, GetTime = -1
+     '-------------------------------------------------------------------
+	Function GetTime(strEventBeingTimedName As String) As Long
+		If (Iselement(EventList(strEventBeingTimedName))) Then
+			If (EventList(strEventBeingTimedName).lngThisRunStartTime <> 0) Then
+                    'Stopwatch is running for this EventBeingTimed
+				GetTime = EventList(strEventBeingTimedName).lngPreviousRunTime + (GetTickCount() - EventList(strEventBeingTimedName).lngThisRunStartTime)
+			Else
+                    'Stopwatch is stopped for this EventBeingTimed
+				GetTime = EventList(strEventBeingTimedName).lngPreviousRunTime
+			End If
+		Else
+               'There is no EventBeingTimed with this name.
+			GetTime = -1
+		End If
+		
+	End Function
+	
+	
+     '-------------------------------------------------------------------
+     ' GetStartCalls
+     ' If there is an EventBeingTimed with this name, return the number of calls.
+     ' If there is no EventBeingTimed with this name, return -1.
+     '-------------------------------------------------------------------
+	Function GetStartCalls(strEventBeingTimedName As String) As Long
+		If (Iselement(EventList(strEventBeingTimedName))) Then
+			GetStartCalls = EventList(strEventBeingTimedName).lngStartCalls
+		Else
+               'There is no EventBeingTimed with this name.
+			GetStartCalls = -1
+		End If
+	End Function
+	
+	
+     '-------------------------------------------------------------------
+     ' GetIsRunning
+     ' If there is an EventBeingTimed with this name and the watch is running, return 1.
+     ' If there is an EventBeingTimed with this name but the watch isn't running, return 0.
+     ' If there is no EventBeingTimed with this name, return -1
+     '-------------------------------------------------------------------
+	Function GetIsRunning(strEventBeingTimedName As String) As Integer
+		If (Iselement(EventList(strEventBeingTimedName))) Then
+			If (EventList(strEventBeingTimedName).lngThisRunStartTime <> 0) Then
+                    'Stopwatch is running for this EventBeingTimed
+				GetIsRunning = 1
+			Else
+                    'Stopwatch is stopped for this EventBeingTimed
+				GetIsRunning = 0
+			End If
+		Else
+               'No EventBeingTimed with this name
+			GetIsRunning = -1
+		End If
+	End Function
+	
+	
+     '-------------------------------------------------------------------
+     ' GetAllWatchValues
+     '-------------------------------------------------------------------
+	Function GetAllWatchValues As String
+		Dim intEventsBeingTimed As Integer     'number of EventsBeingTimed
+		Dim ReportRowArray() As ReportRowType     'Same information as EventList, but is an array so it can be sorted.
+		Dim intCount As Integer     'counter used to loop through all ReportRowArray elements
+		Dim intCompletelySorted As Integer     'flag used in bubble sort
+		Dim Temp As ReportRowType     'swap variable used in bubble sort
+		
+          'Set time on "Total run time" event
+		EventList("Total run time").lngPreviousRunTime = GetTickCount() - EventList("Total run time").lngThisRunStartTime
+		
+          'Build ReportRowArray with EventBeingTimed Name, StartCalls, and RunTime for each EventBeingTimed
+		intEventsBeingTimed = 0
+		Forall EventBeingTimed In EventList
+			intEventsBeingTimed = intEventsBeingTimed + 1
+			Redim Preserve ReportRowArray(1 To intEventsBeingTimed)
+			
+			ReportRowArray(intEventsBeingTimed).strName = Listtag(EventBeingTimed)
+			ReportRowArray(intEventsBeingTimed).lngStartCalls = EventBeingTimed.lngStartCalls
+			ReportRowArray(intEventsBeingTimed).lngRunTime = EventBeingTimed.lngPreviousRunTime
+		End Forall
+		
+          'Sort ReportRowArray - simple bubble sort (descending order)
+		intCompletelySorted = False
+		While (Not intCompletelySorted)
+			intCompletelySorted = True
+			For intCount = 1 To intEventsBeingTimed-1
+				If (ReportRowArray(intCount).lngRunTime < ReportRowArray(intCount + 1).lngRunTime) Then
+                         'Swap array(intCount) and array(intCount + 1)
+					Temp = ReportRowArray(intCount)
+					ReportRowArray(intCount) = ReportRowArray(intCount + 1)
+					ReportRowArray(intCount  + 1) = Temp
+					intCompletelySorted = False
+				End If
+			Next
+		Wend
+		
+          'Add titles to return string
+		GetAllWatchValues = "seconds     %        calls     secs/call   event" & Chr(13) & Chr$(10)
+		GetAllWatchValues = GetAllWatchValues & String$(75, "=") & Chr(13) & Chr$(10)
+		
+          'Add detail rows to return string
+		For intCount = 1 To intEventsBeingTimed
+			GetAllWatchValues = GetAllWatchValues & Format$((ReportRowArray(intCount).lngRunTime/1000), "00000.000") & "   "
+			GetAllWatchValues = GetAllWatchValues & Format$(ReportRowArray(intCount).lngRunTime / EventList("Total run time").lngPreviousRunTime, "000.0%") & "   "
+			GetAllWatchValues = GetAllWatchValues & Format$(ReportRowArray(intCount).lngStartCalls, "0000000") & "   "
+			If (ReportRowArray(intCount).lngStartCalls > 0) Then
+				GetAllWatchValues = GetAllWatchValues & Format$((ReportRowArray(intCount).lngRunTime/1000) / ReportRowArray(intCount).lngStartCalls, "00000.000") & "   "
+			Else
+				GetAllWatchValues = GetAllWatchValues & "00000.000" & "   "
+			End If
+			GetAllWatchValues = GetAllWatchValues & ReportRowArray(intCount).strName & Chr(13) & Chr$(10)
+		Next
+	End Function
+	
+     '-------------------------------------------------------------------
+     ' MailAllWatchValues
+     '-------------------------------------------------------------------
+	Sub MailAllWatchValues(strSendTo As String, strSubject As String)
+		Dim session As NotesSession
+		Dim db As NotesDatabase
+		Dim doc As NotesDocument
+		Dim item As NotesItem
+		Dim body As NotesRichTextItem
+          ' Dim style As NotesRichTextStyle     'delete this line if you are not running R4.6 or later
+		
+		Set session = New NotesSession
+		Set db = session.CurrentDatabase
+		Set doc = New NotesDocument(db)
+		Set item = doc.ReplaceItemValue("Form", "Memo")
+		Set item = doc.ReplaceItemValue("SendTo", strSendTo)
+		Set item = doc.ReplaceItemValue("Subject", strSubject)
+		
+		Set body = New NotesRichTextItem(doc, "Body")
+          ' Set style = session.CreateRichTextStyle     'delete this line if you are not running R4.6 or later
+          ' style.NotesFont = FONT_COURIER     'delete this line if you are not running R4.6 or later
+          ' Call body.AppendStyle(style)     'delete this line if you are not running R4.6 or later
+		Call body.AppendText(Me.GetAllWatchValues)
+		
+		Call doc.Send(False)
+	End Sub
+	
+End Class

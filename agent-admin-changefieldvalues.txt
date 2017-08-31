@@ -1,0 +1,83 @@
+Option Public
+Option Explicit
+
+
+
+
+Sub Initialize
+	Dim s As New NotesSession
+	Dim w As New NotesUIWorkspace
+	Dim coll As NotesDocumentCollection
+	Dim db As NotesDatabase
+	Dim doc As NotesDocument
+	Dim notesItem As NotesItem
+	Dim form As NotesForm
+	Dim formName As String
+	Dim fieldNames() As String
+	Dim newValue As String
+	Dim continue As String
+	Dim fieldChoice As Variant
+	Dim fieldChoiceList As Variant
+	Dim i As Integer
+	Dim confirm As Integer
+	Set db = s.CurrentDatabase
+	Set coll = db.UnprocessedDocuments
+	If ( coll.Count = 0 ) Then
+		Msgbox "You have not selected any documents to change.", 0 , "Error:"
+		Exit Sub
+	End If
+	Set doc = coll.GetFirstDocument
+	formName = doc.Form(0)
+	i = 0
+	Set form = db.GetForm ( formName )
+	Forall item In doc.Items
+		Redim Preserve fieldNames(i)
+		If ( Left ( item.Name, 1 ) <> "$" ) And ( item.Type <> RICHTEXT ) And ( item.Name <> "UNID" ) And ( item.Name <> "FORM" ) Then
+			fieldNames(i) = item.Name
+			i = i + 1
+		End If
+	End Forall
+	
+	Redim Preserve fieldnames(i)
+	fieldNames(i) = "Form"
+	i = i + 1
+	
+	fieldChoiceList= SortArray ( fieldNames )
+	fieldChoice = w.Prompt ( PROMPT_OKCANCELLIST, "Field Name:", "Please choose the name of the field you would like to change.", fieldChoiceList(0), fieldChoiceList )
+	If fieldChoice <> "" Then
+		Set notesItem = doc.GetFirstItem ( fieldChoice )
+		newValue = Inputbox ( "What is the new value for this field?", "New Value:", notesItem.Text )
+		confirm = Msgbox ( "Are you sure you want to change the " & Cstr ( fieldChoice ) & " field to """ & newValue & """ for all selected documents?", 1, "Confirm Change:" )
+		If ( confirm <> 1 ) Then Exit Sub
+		Do Until ( doc Is Nothing )
+			Set notesItem = doc.GetFirstItem ( fieldChoice )
+			notesItem.Values = newValue
+			Call doc.Save ( True, True )
+			Set doc = coll.GetNextDocument ( doc )
+		Loop
+	Else
+		Msgbox ( "No items have been changed" )
+		Exit Sub
+	End If
+End Sub
+
+
+
+
+Function SortArray ( inarray As Variant ) As Variant
+	Dim i , j , max As Integer
+	Dim array As Variant
+	Dim v As Variant
+	array = inarray
+	max = Ubound ( array )
+	For i = 0 To max - 1
+		For j = i + 1 To max
+			If array ( i ) > array ( j ) Then
+				v = array ( i )
+				array ( i ) = array ( j )
+				array ( j ) = v
+			End If
+		Next
+	Next
+	SortArray = array
+End Function
